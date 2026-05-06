@@ -1,0 +1,18 @@
+[project]
+name = "sand-martin"
+version = "0.1.0"
+description = "An MCP server for generating and managing Grasshopper Python components"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.2.0",
+    "rhino3dm>=8.4.0",
+    "ruff>=0.9.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+sand_martin = "sand_martin.server:main"
