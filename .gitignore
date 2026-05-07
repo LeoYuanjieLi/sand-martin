@@ -1,0 +1,23 @@
+# .NET
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.doccache
+*.suo
+*.userprefs
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+build/
+dist/
+*.egg-info/
+
+# macOS
+.DS_Store

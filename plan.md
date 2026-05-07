@@ -44,13 +44,29 @@ sequenceDiagram
 
 ### 1. The Rhino/Grasshopper Host Server (The Engine)
 This is a listener running inside the active Rhino process. It has direct access to the `Grasshopper.Instances.ActiveCanvas` and the `Grasshopper.Kernel` API.
-- **Implementation**: Can be a C# Grasshopper Plugin (`.gha`) or a persistent Python script running in Rhino 8.
+- **Implementation**: A C# Grasshopper Plugin (`.gha`).
 - **Protocol**: Exposes a local HTTP/REST API or WebSocket server (e.g., on `localhost:8081`).
 - **Capabilities**:
   - Add/Remove components to the canvas by GUID.
   - Inject or modify Python code inside a specific `GH_CPython` component.
   - Connect (wire) output parameters to input parameters.
   - Read the current state of the canvas (nodes, connections, coordinates).
+
+#### Project Structure (C#)
+```text
+src/SandMartin.Host/
+├── SandMartin.Host.csproj          # Project file with Rhino/Grasshopper SDKs
+├── SandMartinHostInfo.cs           # Plugin identity (Name, GUID, Icon)
+├── ServerLifecycle.cs              # Auto-start logic (GH_AssemblyPriority)
+├── Models/
+│   └── ApiModels.cs                # JSON structures for requests/responses
+├── Services/
+│   ├── HttpListenerServer.cs       # Background HTTP listener management
+│   ├── RequestDispatcher.cs        # Route mapping & UI Thread marshaling
+│   └── CanvasManager.cs            # Grasshopper.Kernel API orchestration
+└── Scripts/
+    └── postbuild.sh                # Script to deploy .gha to Rhino folder
+```
 
 ### 2. Sand Martin (The MCP Server / LLM Bridge)
 Since starting up full Rhino instances as an MCP standard-I/O child process is too slow/heavy, we run Sand Martin, a lightweight external Python MCP server that talks to the Rhino Host Server.

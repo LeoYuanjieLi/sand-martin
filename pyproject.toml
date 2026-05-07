@@ -3,6 +3,7 @@ name = "sand-martin"
 version = "0.1.0"
 description = "An MCP server for generating and managing Grasshopper Python components"
 readme = "README.md"
+license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
 dependencies = [
     "mcp>=1.2.0",
