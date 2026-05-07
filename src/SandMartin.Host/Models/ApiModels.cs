@@ -57,10 +57,46 @@ namespace SandMartin.Host.Models
         [JsonProperty("name")]
         public string Name { get; set; }
 
+        [JsonProperty("nickname")]
+        public string Nickname { get; set; }
+
         [JsonProperty("type")]
         public string Type { get; set; }
 
+        [JsonProperty("x")]
+        public float X { get; set; }
+
+        [JsonProperty("y")]
+        public float Y { get; set; }
+
+        [JsonProperty("inputs")]
+        public List<ParameterInfo> Inputs { get; set; } = new List<ParameterInfo>();
+
+        [JsonProperty("outputs")]
+        public List<ParameterInfo> Outputs { get; set; } = new List<ParameterInfo>();
+    }
+
+    public class ParameterInfo
+    {
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
         [JsonProperty("nickname")]
         public string Nickname { get; set; }
+
+        [JsonProperty("index")]
+        public int Index { get; set; }
+
+        [JsonProperty("connections")]
+        public List<ConnectionInfo> Connections { get; set; } = new List<ConnectionInfo>();
+    }
+
+    public class ConnectionInfo
+    {
+        [JsonProperty("target_id")]
+        public string TargetId { get; set; }
+
+        [JsonProperty("target_index")]
+        public int TargetIndex { get; set; }
     }
 }

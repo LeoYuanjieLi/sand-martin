@@ -28,7 +28,11 @@ namespace SandMartin.Host.Services
                 string method = request.HttpMethod.ToUpper();
                 string responseBody = "";
 
-                if (method == "POST")
+                if (method == "GET" && path == "/state")
+                {
+                    responseBody = await _canvasManager.GetCanvasState();
+                }
+                else if (method == "POST")
                 {
                     using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
                     {
@@ -54,13 +58,10 @@ namespace SandMartin.Host.Services
                         }
                     }
                 }
-                else if (method == "GET" && path == "/state")
-                {
-                    responseBody = await _canvasManager.GetCanvasState();
-                }
                 else
                 {
-                    response.StatusCode = (int)HttpStatusCode.MethodNotAllowed;
+                    response.StatusCode = (int)HttpStatusCode.NotFound;
+                    responseBody = JsonConvert.SerializeObject(new { error = "Endpoint not found or method not allowed." });
                 }
 
                 byte[] buffer = Encoding.UTF8.GetBytes(responseBody);
