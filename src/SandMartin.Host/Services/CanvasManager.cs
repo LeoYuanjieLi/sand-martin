@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Grasshopper.Kernel;
 using Newtonsoft.Json;
 using SandMartin.Host.Models;
 
@@ -57,7 +58,7 @@ namespace SandMartin.Host.Services
                             Y = obj.Attributes.Pivot.Y
                         };
 
-                        if (obj is Grasshopper.Kernel.IGH_Component component)
+                        if (obj is IGH_Component component)
                         {
                             for (int i = 0; i < component.Params.Input.Count; i++)
                             {
