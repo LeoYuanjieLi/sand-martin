@@ -50,7 +50,7 @@ namespace SandMartin.Host.Services
                                 break;
                             case "/connection":
                                 var connReq = JsonConvert.DeserializeObject<ConnectionRequest>(body);
-                                responseBody = await _canvasManager.ConnectNodes(connReq);
+                                responseBody = await _canvasManager.CreateConnection(connReq);
                                 break;
                             default:
                                 response.StatusCode = (int)HttpStatusCode.NotFound;

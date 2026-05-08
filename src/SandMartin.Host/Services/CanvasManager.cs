@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using Grasshopper;
-using Grasshopper.Kernel;
 using Newtonsoft.Json;
 using SandMartin.Host.Models;
 
@@ -11,28 +8,38 @@ namespace SandMartin.Host.Services
 {
     public class CanvasManager
     {
-        public Task<string> CreateNode(CreateNodeRequest request)
+        public virtual Task<string> GetCanvasState()
         {
-            return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "Not implemented yet" }));
+            try {
+                // Check if we are running inside Rhino by looking for the ActiveCanvas
+                // This is a safe way to check without throwing assembly load errors immediately
+                if (IsRunningInRhino())
+                {
+                    return GetRhinoCanvasState();
+                }
+            } catch {
+                // If assembly loading fails, we are definitely not in Rhino
+            }
+
+            return Task.FromResult(JsonConvert.SerializeObject(new { nodes = new List<NodeInfo>() }));
         }
 
-        public Task<string> UpdateCode(UpdateCodeRequest request)
+        private bool IsRunningInRhino()
         {
-            return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "Not implemented yet" }));
+            try {
+                return Grasshopper.Instances.ActiveCanvas?.Document != null;
+            } catch {
+                return false;
+            }
         }
 
-        public Task<string> ConnectNodes(ConnectionRequest request)
-        {
-            return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "Not implemented yet" }));
-        }
-
-        public Task<string> GetCanvasState()
+        private Task<string> GetRhinoCanvasState()
         {
             var tcs = new TaskCompletionSource<string>();
             
             Rhino.RhinoApp.InvokeOnUiThread(new Action(() => {
                 try {
-                    var doc = Instances.ActiveCanvas?.Document;
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
                     if (doc == null) {
                         tcs.SetResult(JsonConvert.SerializeObject(new { nodes = new List<NodeInfo>() }));
                         return;
@@ -50,7 +57,7 @@ namespace SandMartin.Host.Services
                             Y = obj.Attributes.Pivot.Y
                         };
 
-                        if (obj is IGH_Component component)
+                        if (obj is Grasshopper.Kernel.IGH_Component component)
                         {
                             for (int i = 0; i < component.Params.Input.Count; i++)
                             {
@@ -83,6 +90,21 @@ namespace SandMartin.Host.Services
             }));
 
             return tcs.Task;
+        }
+
+        public virtual Task<string> CreateNode(CreateNodeRequest request)
+        {
+            return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "Not implemented yet" }));
+        }
+
+        public virtual Task<string> UpdateCode(UpdateCodeRequest request)
+        {
+            return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "Not implemented yet" }));
+        }
+
+        public virtual Task<string> CreateConnection(ConnectionRequest request)
+        {
+            return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "Not implemented yet" }));
         }
     }
 }

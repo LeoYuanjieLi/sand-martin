@@ -1,7 +1,12 @@
 using System;
+using System.IO;
 using System.Net;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Rhino;
+using SandMartin.Host.Models;
 
 namespace SandMartin.Host.Services
 {
@@ -28,7 +33,7 @@ namespace SandMartin.Host.Services
             
             Task.Run(() => ListenLoop(_cts.Token));
             
-            Rhino.RhinoApp.WriteLine($"SandMartin Server started on port {_port}");
+            RhinoApp.WriteLine($"SandMartin Server started on port {_port}");
         }
 
         public void Stop()
@@ -36,7 +41,7 @@ namespace SandMartin.Host.Services
             _cts?.Cancel();
             _listener?.Stop();
             _listener?.Close();
-            Rhino.RhinoApp.WriteLine("SandMartin Server stopped.");
+            RhinoApp.WriteLine("SandMartin Server stopped.");
         }
 
         private async Task ListenLoop(CancellationToken token)
@@ -52,9 +57,9 @@ namespace SandMartin.Host.Services
                 {
                     // Ignore exception when stopping
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Rhino.RhinoApp.WriteLine($"SandMartin Server Error: {ex.Message}");
+                    RhinoApp.WriteLine("SandMartin Server Error occurred.");
                 }
             }
         }
