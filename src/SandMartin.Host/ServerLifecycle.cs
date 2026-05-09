@@ -1,20 +1,14 @@
 using System;
 using Grasshopper.Kernel;
-using SandMartin.Host.Services;
 
 namespace SandMartin.Host
 {
     public class ServerLifecycle : GH_AssemblyPriority
     {
-        private HttpListenerServer _server;
-
         public override GH_LoadingInstruction PriorityLoad()
         {
-            var manager = new CanvasManager();
-            var dispatcher = new RequestDispatcher(manager);
-            _server = new HttpListenerServer(dispatcher);
-            _server.Start();
-
+            // Do not automatically start the server here anymore.
+            // The server will now be managed by the SandMartinServerComponent.
             return GH_LoadingInstruction.Proceed;
         }
     }
