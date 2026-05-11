@@ -95,7 +95,100 @@ namespace SandMartin.Host.Services
 
         public virtual Task<string> CreateNode(CreateNodeRequest request)
         {
-            return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "Not implemented yet" }));
+            try {
+                if (IsRunningInRhino())
+                {
+                    return CreateRhinoNode(request);
+                }
+            } catch {
+                // If assembly loading fails, we are definitely not in Rhino
+            }
+
+            return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "No active Grasshopper document" }));
+        }
+
+        private Task<string> CreateRhinoNode(CreateNodeRequest request)
+        {
+            var tcs = new TaskCompletionSource<string>();
+
+            Rhino.RhinoApp.InvokeOnUiThread(new Action(() => {
+                try {
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+                    if (doc == null) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = "No active Grasshopper document" }));
+                        return;
+                    }
+
+                    // Find the component proxy by type or name
+                    IGH_ObjectProxy proxy = null;
+                    foreach (var p in Grasshopper.Instances.ComponentServer.ObjectProxies)
+                    {
+                        if (p.Desc.Name.Equals(request.Type, StringComparison.OrdinalIgnoreCase) || 
+                            p.Type.Name.Equals(request.Type, StringComparison.OrdinalIgnoreCase))
+                        {
+                            proxy = p;
+                            break;
+                        }
+                    }
+
+                    if (proxy == null) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = $"Component type '{request.Type}' not found" }));
+                        return;
+                    }
+
+                    // Create the instance
+                    var obj = proxy.CreateInstance();
+                    if (obj == null) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = "Failed to create component instance" }));
+                        return;
+                    }
+
+                    // Set coordinates
+                    obj.CreateAttributes();
+                    obj.Attributes.Pivot = new System.Drawing.PointF(request.CanvasX, request.CanvasY);
+
+                    // Set nickname if provided
+                    if (!string.IsNullOrEmpty(request.Name)) {
+                        obj.NickName = request.Name;
+                    }
+
+                    // Add to canvas
+                    doc.AddObject(obj, false);
+
+                    // Attempt to set initial parameter values if provided
+                    if (request.Parameters != null && obj is IGH_Component component)
+                    {
+                        foreach (var kvp in request.Parameters)
+                        {
+                            var inputParam = component.Params.Input.Find(p => p.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase) || 
+                                                                             p.NickName.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
+                            
+                            if (inputParam != null)
+                            {
+                                // IMPORTANT: For persistent data, we must cast the parameter
+                                // to IGH_Param and use AddVolatileData. Wait, for Grasshopper,
+                                // we need to parse the object type correctly or set it via SetPersistentData.
+                                // It is often safer to set volatile data first. Let's do it using AddVolatileData.
+                                // To make Grasshopper parse it from a string properly, we use GH_Convert.
+                                
+                                // Clean volatile data first just in case
+                                inputParam.VolatileData.Clear();
+                                inputParam.AddVolatileData(new Grasshopper.Kernel.Data.GH_Path(0), 0, kvp.Value.ToString());
+                            }
+                        }
+                    }
+
+                    // Trigger a recalculation so the new data is processed
+                    obj.ExpireSolution(true);
+
+                    tcs.SetResult(JsonConvert.SerializeObject(new { status = "success", id = obj.InstanceGuid.ToString() }));
+
+                } catch (Exception ex) {
+                    tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = ex.Message }));
+                }
+            }));
+
+            return tcs.Task;
         }
 
         public virtual Task<string> UpdateCode(UpdateCodeRequest request)

@@ -11,11 +11,14 @@ namespace SandMartin.Host.Models
         [JsonProperty("name")]
         public string Name { get; set; }
 
-        [JsonProperty("x")]
-        public int X { get; set; }
+        [JsonProperty("canvasX")]
+        public int CanvasX { get; set; }
 
-        [JsonProperty("y")]
-        public int Y { get; set; }
+        [JsonProperty("canvasY")]
+        public int CanvasY { get; set; }
+
+        [JsonProperty("parameters")]
+        public Dictionary<string, object> Parameters { get; set; }
     }
 
     public class UpdateCodeRequest

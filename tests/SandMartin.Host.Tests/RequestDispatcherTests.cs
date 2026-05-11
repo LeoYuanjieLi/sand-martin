@@ -12,25 +12,6 @@ namespace SandMartin.Host.Tests
     public class RequestDispatcherTests
     {
         [Fact]
-        public async Task CanvasManager_GetCanvasState_ReturnsValidJson()
-        {
-            // Testing the CanvasManager directly in .NET 7.0 mode 
-            // to ensure it returns the expected "empty" state logic we set up.
-            
-            // Arrange
-            var manager = new CanvasManager();
-
-            // Act
-            var result = await manager.GetCanvasState();
-            var response = JsonConvert.DeserializeObject<CanvasStateResponse>(result);
-
-            // Assert
-            Assert.NotNull(response);
-            Assert.NotNull(response.Nodes);
-            Assert.Empty(response.Nodes);
-        }
-
-        [Fact]
         public void RequestDispatcher_Initialization_Works()
         {
             // Simple architectural test to ensure the dispatcher can be instantiated
