@@ -76,10 +76,10 @@ Since starting up full Rhino instances as an MCP standard-I/O child process is t
 ## Proposed API / Tooling Capabilities
 
 ### CRUD & Code Injection
-- `create_node(type: str, name: str, x: int, y: int)`: Instantiates a component on the canvas.
-- `update_python_node(node_id: str, code: str)`: Injects new Python code into a specific Python component on the canvas.
-- `delete_node(node_id: str)`: Removes a component.
-- `get_canvas_state()`: Returns a JSON representation of all nodes and their IDs on the canvas.
+- [x] `createNode(type: str, name: str, canvasX: int, canvasY: int)`: Instantiates a component on the canvas.
+- [ ] `updateNode(node_id: str, ...args)`: Update an existing component.
+- [ ] `delete_node(node_id: str)`: Removes a component.
+- [x] `get_canvas_state()`: Returns a JSON representation of all nodes and their IDs on the canvas.
 
 ### Orchestration (Wiring)
 - `connect_nodes(source_id: str, source_output_index: int, target_id: str, target_input_index: int)`: Wires two components together.
