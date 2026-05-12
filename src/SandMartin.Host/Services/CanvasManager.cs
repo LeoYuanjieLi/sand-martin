@@ -12,14 +12,11 @@ namespace SandMartin.Host.Services
         public virtual Task<string> GetCanvasState()
         {
             try {
-                // Check if we are running inside Rhino by looking for the ActiveCanvas
-                // This is a safe way to check without throwing assembly load errors immediately
                 if (IsRunningInRhino())
                 {
                     return GetRhinoCanvasState();
                 }
             } catch {
-                // If assembly loading fails, we are definitely not in Rhino
             }
 
             return Task.FromResult(JsonConvert.SerializeObject(new { nodes = new List<NodeInfo>() }));
@@ -101,7 +98,6 @@ namespace SandMartin.Host.Services
                     return CreateRhinoNode(request);
                 }
             } catch {
-                // If assembly loading fails, we are definitely not in Rhino
             }
 
             return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "No active Grasshopper document" }));
@@ -119,7 +115,6 @@ namespace SandMartin.Host.Services
                         return;
                     }
 
-                    // Find the component proxy by type or name
                     IGH_ObjectProxy proxy = null;
                     foreach (var p in Grasshopper.Instances.ComponentServer.ObjectProxies)
                     {
@@ -136,50 +131,136 @@ namespace SandMartin.Host.Services
                         return;
                     }
 
-                    // Create the instance
                     var obj = proxy.CreateInstance();
                     if (obj == null) {
                         tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = "Failed to create component instance" }));
                         return;
                     }
 
-                    // Set coordinates
                     obj.CreateAttributes();
                     obj.Attributes.Pivot = new System.Drawing.PointF(request.CanvasX, request.CanvasY);
 
-                    // Set nickname if provided
                     if (!string.IsNullOrEmpty(request.Name)) {
                         obj.NickName = request.Name;
                     }
 
-                    // Add to canvas
                     doc.AddObject(obj, false);
 
-                    // Attempt to set initial parameter values if provided
-                    if (request.Parameters != null && obj is IGH_Component component)
+                    if (request.Parameters != null)
                     {
-                        foreach (var kvp in request.Parameters)
+                        if (obj is IGH_Component component)
                         {
-                            var inputParam = component.Params.Input.Find(p => p.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase) || 
-                                                                             p.NickName.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
-                            
-                            if (inputParam != null)
+                            foreach (var kvp in request.Parameters)
                             {
-                                // IMPORTANT: For persistent data, we must cast the parameter
-                                // to IGH_Param and use AddVolatileData. Wait, for Grasshopper,
-                                // we need to parse the object type correctly or set it via SetPersistentData.
-                                // It is often safer to set volatile data first. Let's do it using AddVolatileData.
-                                // To make Grasshopper parse it from a string properly, we use GH_Convert.
-                                
-                                // Clean volatile data first just in case
-                                inputParam.VolatileData.Clear();
-                                inputParam.AddVolatileData(new Grasshopper.Kernel.Data.GH_Path(0), 0, kvp.Value.ToString());
+                                if (kvp.Key.Equals("Code", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    SetComponentCode(obj, kvp.Value.ToString().Replace("\\n", "\n"));
+                                }
+                                else
+                                {
+                                    var inputParam = component.Params.Input.Find(p => p.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase) || 
+                                                                                    p.NickName.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
+                                    
+                                    if (inputParam != null)
+                                    {
+                                        inputParam.VolatileData.Clear();
+                                        inputParam.AddVolatileData(new Grasshopper.Kernel.Data.GH_Path(0), 0, kvp.Value.ToString());
+                                    }
+                                }
                             }
                         }
                     }
 
-                    // Trigger a recalculation so the new data is processed
                     obj.ExpireSolution(true);
+                    tcs.SetResult(JsonConvert.SerializeObject(new { status = "success", id = obj.InstanceGuid.ToString() }));
+
+                } catch (Exception ex) {
+                    tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = ex.Message }));
+                }
+            }));
+
+            return tcs.Task;
+        }
+
+        public virtual Task<string> UpdateNode(UpdateNodeRequest request)
+        {
+            try {
+                if (IsRunningInRhino())
+                {
+                    return UpdateRhinoNode(request);
+                }
+            } catch {
+            }
+
+            return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "No active Grasshopper document" }));
+        }
+
+        private Task<string> UpdateRhinoNode(UpdateNodeRequest request)
+        {
+            var tcs = new TaskCompletionSource<string>();
+
+            Rhino.RhinoApp.InvokeOnUiThread(new Action(() => {
+                try {
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+                    if (doc == null) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = "No active Grasshopper document" }));
+                        return;
+                    }
+
+                    if (!Guid.TryParse(request.NodeId, out Guid nodeId)) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = "Invalid node ID format" }));
+                        return;
+                    }
+
+                    var obj = doc.FindObject(nodeId, true);
+                    if (obj == null) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = "Node not found" }));
+                        return;
+                    }
+
+                    bool modified = false;
+
+                    if (request.CanvasX.HasValue || request.CanvasY.HasValue) {
+                        float x = request.CanvasX.HasValue ? request.CanvasX.Value : obj.Attributes.Pivot.X;
+                        float y = request.CanvasY.HasValue ? request.CanvasY.Value : obj.Attributes.Pivot.Y;
+                        obj.Attributes.Pivot = new System.Drawing.PointF(x, y);
+                        obj.Attributes.ExpireLayout();
+                        modified = true;
+                    }
+
+                    if (!string.IsNullOrEmpty(request.Name)) {
+                        obj.NickName = request.Name;
+                        modified = true;
+                    }
+
+                    if (request.Parameters != null && obj is IGH_Component component)
+                    {
+                        foreach (var kvp in request.Parameters)
+                        {
+                            if (kvp.Key.Equals("Code", StringComparison.OrdinalIgnoreCase))
+                            {
+                                bool codeSet = SetComponentCode(obj, kvp.Value.ToString().Replace("\\n", "\n"));
+                                if (codeSet) modified = true;
+                            }
+                            else
+                            {
+                                var inputParam = component.Params.Input.Find(p => p.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase) || 
+                                                                                 p.NickName.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
+                                
+                                if (inputParam != null)
+                                {
+                                    inputParam.VolatileData.Clear();
+                                    inputParam.AddVolatileData(new Grasshopper.Kernel.Data.GH_Path(0), 0, kvp.Value.ToString());
+                                    modified = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (modified) {
+                        obj.Attributes.ExpireLayout();
+                        obj.ExpireSolution(true);
+                    }
 
                     tcs.SetResult(JsonConvert.SerializeObject(new { status = "success", id = obj.InstanceGuid.ToString() }));
 
@@ -191,9 +272,121 @@ namespace SandMartin.Host.Services
             return tcs.Task;
         }
 
-        public virtual Task<string> UpdateCode(UpdateCodeRequest request)
+        private bool SetComponentCode(IGH_DocumentObject obj, string code)
         {
-            return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "Not implemented yet" }));
+            try
+            {
+                var type = obj.GetType();
+
+                var contextField = type.GetField("Context", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (contextField != null)
+                {
+                    var contextObj = contextField.GetValue(obj);
+                    if (contextObj != null)
+                    {
+                        // 1) First call Context.SetText(code) which handles all the inner Script bindings
+                        var ctxSetTextMethod = contextObj.GetType().GetMethod("SetText", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string) }, null);
+                        if (ctxSetTextMethod != null)
+                        {
+                            ctxSetTextMethod.Invoke(contextObj, new object[] { code });
+                        }
+                        
+                        // 2) Alternatively call Script.SetText(code) if Context.SetText doesn't exist
+                        var scriptProp = contextObj.GetType().GetProperty("Script", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        if (scriptProp != null)
+                        {
+                            var scriptObj = scriptProp.GetValue(contextObj);
+                            if (scriptObj != null)
+                            {
+                                var scriptSetTextMethod = scriptObj.GetType().GetMethod("SetText", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string) }, null);
+                                if (scriptSetTextMethod != null)
+                                {
+                                    scriptSetTextMethod.Invoke(scriptObj, new object[] { code });
+                                }
+                                else
+                                {
+                                    var textProp = scriptObj.GetType().GetProperty("Text", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                                    if (textProp != null)
+                                    {
+                                        textProp.SetValue(scriptObj, code);
+                                    }
+                                }
+
+                                // 3) Try TryBuildCode on Context first
+                                var tryBuildCodeContext = contextObj.GetType().GetMethod("TryBuildCode", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { }, null);
+                                if (tryBuildCodeContext != null)
+                                {
+                                    tryBuildCodeContext.Invoke(contextObj, new object[] { });
+                                }
+                                
+                                // 4) Then TryBuild on Script
+                                var tryBuildScript = scriptObj.GetType().GetMethod("TryBuild", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { }, null);
+                                if (tryBuildScript != null)
+                                {
+                                    tryBuildScript.Invoke(scriptObj, new object[] { });
+                                }
+                            }
+                        }
+
+                        // 5) Try invoking OnScriptChanged or OnCodeChanged to notify component internals
+                        var onScriptChangedMethod = contextObj.GetType().GetMethod("OnScriptChanged", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        if (onScriptChangedMethod != null)
+                        {
+                            onScriptChangedMethod.Invoke(contextObj, new object[] { });
+                        }
+
+                        // 6) FORCE CACHE EXPIRATION ON CONTEXT
+                        var expireCacheContext = contextObj.GetType().GetMethod("ExpireCache", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { }, null);
+                        if (expireCacheContext != null)
+                        {
+                            expireCacheContext.Invoke(contextObj, new object[] { });
+                        }
+
+                        // 7) FORCE REBUILD ON CONTEXT
+                        var rebuildMethod = contextObj.GetType().GetMethod("ReBuild", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { }, null);
+                        if (rebuildMethod != null)
+                        {
+                            rebuildMethod.Invoke(contextObj, new object[] { });
+                        }
+                        
+                        // Immediately force calculation for this object so Grasshopper knows about the change right now
+                        obj.ExpireSolution(true);
+                        return true;
+                    }
+                }
+
+                // Try Rhino 8 Code property on main component
+                var mainCodeProp = type.GetProperty("Code", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (mainCodeProp != null && mainCodeProp.PropertyType == typeof(string))
+                {
+                    mainCodeProp.SetValue(obj, code);
+                    obj.ExpireSolution(true);
+                    return true;
+                }
+
+                // Try older ScriptSource property
+                var scriptSourceProp = type.GetProperty("ScriptSource");
+                if (scriptSourceProp != null)
+                {
+                    var scriptSource = scriptSourceProp.GetValue(obj);
+                    if (scriptSource != null)
+                    {
+                        var scriptCodeProp = scriptSource.GetType().GetProperty("ScriptCode");
+                        if (scriptCodeProp != null)
+                        {
+                            scriptCodeProp.SetValue(scriptSource, code);
+                            obj.ExpireSolution(true);
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
         }
 
         public virtual Task<string> CreateConnection(ConnectionRequest request)

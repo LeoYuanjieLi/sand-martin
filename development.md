@@ -77,7 +77,7 @@ Since starting up full Rhino instances as an MCP standard-I/O child process is t
 
 ### CRUD & Code Injection
 - [x] `createNode(type: str, name: str, canvasX: int, canvasY: int)`: Instantiates a component on the canvas.
-- [ ] `updateNode(node_id: str, ...args)`: Update an existing component.
+- [x] `updateNode(node_id: str, ...args)`: Update an existing component.
 - [ ] `delete_node(node_id: str)`: Removes a component.
 - [x] `get_canvas_state()`: Returns a JSON representation of all nodes and their IDs on the canvas.
 

@@ -44,10 +44,6 @@ namespace SandMartin.Host.Services
                                 var createReq = JsonConvert.DeserializeObject<CreateNodeRequest>(body);
                                 responseBody = await _canvasManager.CreateNode(createReq);
                                 break;
-                            case "/code":
-                                var codeReq = JsonConvert.DeserializeObject<UpdateCodeRequest>(body);
-                                responseBody = await _canvasManager.UpdateCode(codeReq);
-                                break;
                             case "/connection":
                                 var connReq = JsonConvert.DeserializeObject<ConnectionRequest>(body);
                                 responseBody = await _canvasManager.CreateConnection(connReq);
@@ -55,6 +51,25 @@ namespace SandMartin.Host.Services
                             default:
                                 response.StatusCode = (int)HttpStatusCode.NotFound;
                                 break;
+                        }
+                    }
+                }
+                else if (method == "PATCH")
+                {
+                    using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
+                    {
+                        string body = await reader.ReadToEndAsync();
+
+                        if (path.StartsWith("/update/"))
+                        {
+                            var nodeId = path.Substring("/update/".Length);
+                            var updateReq = JsonConvert.DeserializeObject<UpdateNodeRequest>(body) ?? new UpdateNodeRequest();
+                            updateReq.NodeId = nodeId;
+                            responseBody = await _canvasManager.UpdateNode(updateReq);
+                        }
+                        else
+                        {
+                            response.StatusCode = (int)HttpStatusCode.NotFound;
                         }
                     }
                 }

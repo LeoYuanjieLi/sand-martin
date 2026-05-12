@@ -56,5 +56,31 @@ namespace SandMartin.Host.Tests
             Assert.True(response.ContainsKey("message"), "Response should contain a 'message' field");
             Assert.Equal("No active Grasshopper document", response["message"]);
         }
+
+        [Fact]
+        public async Task UpdateNode_NotRunningInRhino_ReturnsErrorJson()
+        {
+            // Arrange
+            var manager = new CanvasManager();
+            var request = new UpdateNodeRequest
+            {
+                NodeId = Guid.NewGuid().ToString(),
+                Name = "Updated Name"
+            };
+
+            // Act
+            var jsonResult = await manager.UpdateNode(request);
+            
+            // Assert
+            Assert.NotNull(jsonResult);
+            
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+            
+            Assert.True(response.ContainsKey("status"), "Response should contain a 'status' field");
+            Assert.Equal("error", response["status"]);
+            
+            Assert.True(response.ContainsKey("message"), "Response should contain a 'message' field");
+            Assert.Equal("No active Grasshopper document", response["message"]);
+        }
     }
 }
