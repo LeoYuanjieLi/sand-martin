@@ -133,3 +133,26 @@ curl -X PATCH http://localhost:8081/update/4c62be40-99ef-422f-a417-f54ca8556142 
 ```
 
 After running this, the script node's name will change to "Random Cubes Grid", the script editor will immediately update, the component will re-calculate, and the spheres in your Rhino viewport will magically transform into varying cubes!
+
+---
+
+### 6. Test the `/node/{nodeId}` DELETE Endpoint
+
+This command removes a component from the canvas.
+
+**Important:** Replace `"YOUR_NODE_ID"` with the actual `id` of a component you want to delete.
+
+```bash
+# Request
+# Remember to replace YOUR_NODE_ID with the actual ID.
+curl -X DELETE http://localhost:8081/node/YOUR_NODE_ID
+```
+
+**Expected Response (Example):**
+```json
+{
+  "status": "success",
+  "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+}
+```
+After running this, the component with the specified ID should disappear from your Grasshopper canvas.

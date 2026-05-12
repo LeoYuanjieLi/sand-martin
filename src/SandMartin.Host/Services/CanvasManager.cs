@@ -272,6 +272,54 @@ namespace SandMartin.Host.Services
             return tcs.Task;
         }
 
+        public virtual Task<string> DeleteNode(string nodeId)
+        {
+            try {
+                if (IsRunningInRhino())
+                {
+                    return DeleteRhinoNode(nodeId);
+                }
+            } catch {
+            }
+
+            return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "No active Grasshopper document" }));
+        }
+
+        private Task<string> DeleteRhinoNode(string nodeId)
+        {
+            var tcs = new TaskCompletionSource<string>();
+
+            Rhino.RhinoApp.InvokeOnUiThread(new Action(() => {
+                try {
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+                    if (doc == null) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = "No active Grasshopper document" }));
+                        return;
+                    }
+
+                    if (!Guid.TryParse(nodeId, out Guid guid)) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = "Invalid node ID format" }));
+                        return;
+                    }
+
+                    var obj = doc.FindObject(guid, true);
+                    if (obj == null) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = "Node not found" }));
+                        return;
+                    }
+
+                    doc.RemoveObject(obj, true);
+
+                    tcs.SetResult(JsonConvert.SerializeObject(new { status = "success", id = nodeId }));
+
+                } catch (Exception ex) {
+                    tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = ex.Message }));
+                }
+            }));
+
+            return tcs.Task;
+        }
+
         public virtual Task<string> CreateConnection(ConnectionRequest request)
         {
             return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "Not implemented yet" }));

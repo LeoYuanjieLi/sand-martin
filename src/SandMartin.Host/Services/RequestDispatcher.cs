@@ -73,6 +73,18 @@ namespace SandMartin.Host.Services
                         }
                     }
                 }
+                else if (method == "DELETE")
+                {
+                    if (path.StartsWith("/node/"))
+                    {
+                        var nodeId = path.Substring("/node/".Length);
+                        responseBody = await _canvasManager.DeleteNode(nodeId);
+                    }
+                    else
+                    {
+                        response.StatusCode = (int)HttpStatusCode.NotFound;
+                    }
+                }
                 else
                 {
                     response.StatusCode = (int)HttpStatusCode.NotFound;
