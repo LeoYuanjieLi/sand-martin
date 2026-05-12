@@ -54,6 +54,15 @@ namespace SandMartin.Host.Models
         public int TargetInputIndex { get; set; }
     }
 
+    public class DisconnectRequest
+    {
+        [JsonProperty("source_id")]
+        public string SourceId { get; set; }
+
+        [JsonProperty("target_id")]
+        public string TargetId { get; set; }
+    }
+
     public class CanvasStateResponse
     {
         [JsonProperty("nodes")]

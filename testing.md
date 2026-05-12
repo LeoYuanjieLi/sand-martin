@@ -156,3 +156,55 @@ curl -X DELETE http://localhost:8081/node/YOUR_NODE_ID
 }
 ```
 After running this, the component with the specified ID should disappear from your Grasshopper canvas.
+
+---
+
+### 7. Test the `/connection` Endpoint
+
+This command wires two components together. It connects a source output to a target input.
+
+**Important:** Replace `"SOURCE_ID"` and `"TARGET_ID"` with actual GUIDs from your canvas.
+
+```bash
+# Request
+curl -X POST http://localhost:8081/connection \
+-H "Content-Type: application/json" \
+-d '{
+  "source_id": "2edf0867-8559-47b6-91a7-e50cb8fa0d7b",
+  "source_output_index": 0,
+  "target_id": "5f96b403-8126-4301-bfee-814a7debf295",
+  "target_input_index": 0
+}'
+```
+
+**Expected Response:**
+```json
+{
+  "status": "success"
+}
+```
+
+---
+
+### 8. Test the `/disconnect` Endpoint
+
+This command removes all wires between two specific components.
+
+**Important:** Replace `"SOURCE_ID"` and `"TARGET_ID"` with actual GUIDs.
+
+```bash
+# Request
+curl -X POST http://localhost:8081/disconnect \
+-H "Content-Type: application/json" \
+-d '{
+  "source_id": "2edf0867-8559-47b6-91a7-e50cb8fa0d7b",
+  "target_id": "5f96b403-8126-4301-bfee-814a7debf295"
+}'
+```
+
+**Expected Response:**
+```json
+{
+  "status": "success"
+}
+```
