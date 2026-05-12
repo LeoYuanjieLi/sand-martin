@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Moq;
 using Newtonsoft.Json;
 using SandMartin.Host.Models;
 using SandMartin.Host.Services;
@@ -15,11 +14,15 @@ namespace SandMartin.Host.Tests
         public void RequestDispatcher_Initialization_Works()
         {
             // Simple architectural test to ensure the dispatcher can be instantiated
-            // with a mocked manager.
+            // with a dummy manager.
             
             // Arrange
-            var mockManager = new Mock<CanvasManager>();
-            var dispatcher = new RequestDispatcher(mockManager.Object);
+            // Avoid using Moq on CanvasManager here because Moq tries to reflect over the class
+            // to generate a proxy. Since CanvasManager uses Grasshopper types (like IGH_DocumentObject)
+            // in its method signatures, Moq fails when it can't load the Grasshopper assembly 
+            // in a headless xUnit environment.
+            var dummyManager = new CanvasManager();
+            var dispatcher = new RequestDispatcher(dummyManager);
 
             // Assert
             Assert.NotNull(dispatcher);

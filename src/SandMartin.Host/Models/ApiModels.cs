@@ -21,13 +21,22 @@ namespace SandMartin.Host.Models
         public Dictionary<string, object> Parameters { get; set; }
     }
 
-    public class UpdateCodeRequest
+    public class UpdateNodeRequest
     {
-        [JsonProperty("node_id")]
+        [JsonProperty("nodeId")]
         public string NodeId { get; set; }
 
-        [JsonProperty("code")]
-        public string Code { get; set; }
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("canvasX")]
+        public int? CanvasX { get; set; }
+
+        [JsonProperty("canvasY")]
+        public int? CanvasY { get; set; }
+
+        [JsonProperty("parameters")]
+        public Dictionary<string, object> Parameters { get; set; }
     }
 
     public class ConnectionRequest
