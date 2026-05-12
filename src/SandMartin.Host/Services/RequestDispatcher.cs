@@ -48,6 +48,10 @@ namespace SandMartin.Host.Services
                                 var connReq = JsonConvert.DeserializeObject<ConnectionRequest>(body);
                                 responseBody = await _canvasManager.CreateConnection(connReq);
                                 break;
+                            case "/disconnect":
+                                var discReq = JsonConvert.DeserializeObject<DisconnectRequest>(body);
+                                responseBody = await _canvasManager.DisconnectNode(discReq);
+                                break;
                             default:
                                 response.StatusCode = (int)HttpStatusCode.NotFound;
                                 break;
