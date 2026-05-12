@@ -45,5 +45,23 @@ namespace SandMartin.Host.Tests
             // Assert
             Assert.Equal("{\"nodes\":[]}", json);
         }
+
+        [Fact]
+        public void DisconnectRequest_Serialization_ReturnsCorrectJson()
+        {
+            // Arrange
+            var request = new DisconnectRequest
+            {
+                SourceId = "source-guid",
+                TargetId = "target-guid"
+            };
+
+            // Act
+            var json = JsonConvert.SerializeObject(request);
+
+            // Assert
+            Assert.Contains("\"source_id\":\"source-guid\"", json);
+            Assert.Contains("\"target_id\":\"target-guid\"", json);
+        }
     }
 }

@@ -104,5 +104,59 @@ namespace SandMartin.Host.Tests
             Assert.True(response.ContainsKey("message"), "Response should contain a 'message' field");
             Assert.Equal("No active Grasshopper document", response["message"]);
         }
+
+        [Fact]
+        public async Task CreateConnection_NotRunningInRhino_ReturnsErrorJson()
+        {
+            // Arrange
+            var manager = new CanvasManager();
+            var request = new ConnectionRequest
+            {
+                SourceId = Guid.NewGuid().ToString(),
+                TargetId = Guid.NewGuid().ToString(),
+                SourceOutputIndex = 0,
+                TargetInputIndex = 0
+            };
+
+            // Act
+            var jsonResult = await manager.CreateConnection(request);
+            
+            // Assert
+            Assert.NotNull(jsonResult);
+            
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+            
+            Assert.True(response.ContainsKey("status"), "Response should contain a 'status' field");
+            Assert.Equal("error", response["status"]);
+            
+            Assert.True(response.ContainsKey("message"), "Response should contain a 'message' field");
+            Assert.Equal("No active Grasshopper document", response["message"]);
+        }
+
+        [Fact]
+        public async Task DisconnectNode_NotRunningInRhino_ReturnsErrorJson()
+        {
+            // Arrange
+            var manager = new CanvasManager();
+            var request = new DisconnectRequest
+            {
+                SourceId = Guid.NewGuid().ToString(),
+                TargetId = Guid.NewGuid().ToString()
+            };
+
+            // Act
+            var jsonResult = await manager.DisconnectNode(request);
+            
+            // Assert
+            Assert.NotNull(jsonResult);
+            
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+            
+            Assert.True(response.ContainsKey("status"), "Response should contain a 'status' field");
+            Assert.Equal("error", response["status"]);
+            
+            Assert.True(response.ContainsKey("message"), "Response should contain a 'message' field");
+            Assert.Equal("No active Grasshopper document", response["message"]);
+        }
     }
 }
