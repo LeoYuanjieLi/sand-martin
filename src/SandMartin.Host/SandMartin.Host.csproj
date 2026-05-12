@@ -12,6 +12,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>SandMartin.Host.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Grasshopper" Version="8.0.23304.9001" IncludeAssets="compile;build" />
     <PackageReference Include="RhinoCommon" Version="8.0.23304.9001" IncludeAssets="compile;build" />

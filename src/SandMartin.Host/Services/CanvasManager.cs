@@ -154,7 +154,7 @@ namespace SandMartin.Host.Services
                             {
                                 if (kvp.Key.Equals("Code", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    SetComponentCode(obj, kvp.Value.ToString().Replace("\\n", "\n"));
+                                    ScriptInjector.SetComponentCode(obj, kvp.Value.ToString());
                                 }
                                 else
                                 {
@@ -239,7 +239,7 @@ namespace SandMartin.Host.Services
                         {
                             if (kvp.Key.Equals("Code", StringComparison.OrdinalIgnoreCase))
                             {
-                                bool codeSet = SetComponentCode(obj, kvp.Value.ToString().Replace("\\n", "\n"));
+                                bool codeSet = ScriptInjector.SetComponentCode(obj, kvp.Value.ToString());
                                 if (codeSet) modified = true;
                             }
                             else
@@ -270,123 +270,6 @@ namespace SandMartin.Host.Services
             }));
 
             return tcs.Task;
-        }
-
-        private bool SetComponentCode(IGH_DocumentObject obj, string code)
-        {
-            try
-            {
-                var type = obj.GetType();
-
-                var contextField = type.GetField("Context", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (contextField != null)
-                {
-                    var contextObj = contextField.GetValue(obj);
-                    if (contextObj != null)
-                    {
-                        // 1) First call Context.SetText(code) which handles all the inner Script bindings
-                        var ctxSetTextMethod = contextObj.GetType().GetMethod("SetText", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string) }, null);
-                        if (ctxSetTextMethod != null)
-                        {
-                            ctxSetTextMethod.Invoke(contextObj, new object[] { code });
-                        }
-                        
-                        // 2) Alternatively call Script.SetText(code) if Context.SetText doesn't exist
-                        var scriptProp = contextObj.GetType().GetProperty("Script", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                        if (scriptProp != null)
-                        {
-                            var scriptObj = scriptProp.GetValue(contextObj);
-                            if (scriptObj != null)
-                            {
-                                var scriptSetTextMethod = scriptObj.GetType().GetMethod("SetText", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { typeof(string) }, null);
-                                if (scriptSetTextMethod != null)
-                                {
-                                    scriptSetTextMethod.Invoke(scriptObj, new object[] { code });
-                                }
-                                else
-                                {
-                                    var textProp = scriptObj.GetType().GetProperty("Text", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                                    if (textProp != null)
-                                    {
-                                        textProp.SetValue(scriptObj, code);
-                                    }
-                                }
-
-                                // 3) Try TryBuildCode on Context first
-                                var tryBuildCodeContext = contextObj.GetType().GetMethod("TryBuildCode", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { }, null);
-                                if (tryBuildCodeContext != null)
-                                {
-                                    tryBuildCodeContext.Invoke(contextObj, new object[] { });
-                                }
-                                
-                                // 4) Then TryBuild on Script
-                                var tryBuildScript = scriptObj.GetType().GetMethod("TryBuild", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { }, null);
-                                if (tryBuildScript != null)
-                                {
-                                    tryBuildScript.Invoke(scriptObj, new object[] { });
-                                }
-                            }
-                        }
-
-                        // 5) Try invoking OnScriptChanged or OnCodeChanged to notify component internals
-                        var onScriptChangedMethod = contextObj.GetType().GetMethod("OnScriptChanged", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                        if (onScriptChangedMethod != null)
-                        {
-                            onScriptChangedMethod.Invoke(contextObj, new object[] { });
-                        }
-
-                        // 6) FORCE CACHE EXPIRATION ON CONTEXT
-                        var expireCacheContext = contextObj.GetType().GetMethod("ExpireCache", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { }, null);
-                        if (expireCacheContext != null)
-                        {
-                            expireCacheContext.Invoke(contextObj, new object[] { });
-                        }
-
-                        // 7) FORCE REBUILD ON CONTEXT
-                        var rebuildMethod = contextObj.GetType().GetMethod("ReBuild", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new Type[] { }, null);
-                        if (rebuildMethod != null)
-                        {
-                            rebuildMethod.Invoke(contextObj, new object[] { });
-                        }
-                        
-                        // Immediately force calculation for this object so Grasshopper knows about the change right now
-                        obj.ExpireSolution(true);
-                        return true;
-                    }
-                }
-
-                // Try Rhino 8 Code property on main component
-                var mainCodeProp = type.GetProperty("Code", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (mainCodeProp != null && mainCodeProp.PropertyType == typeof(string))
-                {
-                    mainCodeProp.SetValue(obj, code);
-                    obj.ExpireSolution(true);
-                    return true;
-                }
-
-                // Try older ScriptSource property
-                var scriptSourceProp = type.GetProperty("ScriptSource");
-                if (scriptSourceProp != null)
-                {
-                    var scriptSource = scriptSourceProp.GetValue(obj);
-                    if (scriptSource != null)
-                    {
-                        var scriptCodeProp = scriptSource.GetType().GetProperty("ScriptCode");
-                        if (scriptCodeProp != null)
-                        {
-                            scriptCodeProp.SetValue(scriptSource, code);
-                            obj.ExpireSolution(true);
-                            return true;
-                        }
-                    }
-                }
-
-                return false;
-            }
-            catch (Exception ex)
-            {
-                return false;
-            }
         }
 
         public virtual Task<string> CreateConnection(ConnectionRequest request)
