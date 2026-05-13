@@ -21,17 +21,15 @@ Sand Martin uses a **Client-Server model**:
 - .NET SDK 6.0+ (for building the Host)
 - Python 3.10+
 
-### 2. Build & Install the Host Plugin
-From the root directory:
-```bash
-dotnet build
-```
-The build process will automatically attempt to deploy the `.gha` plugin to your Rhino Libraries folder.
+### 2. Install the Python Bridge
+You can install the Sand Martin bridge directly from [PyPI](https://pypi.org/project/sand-martin/):
 
-### 3. Install the Python Bridge
 ```bash
-pip install -e .
+pip install sand-martin
 ```
+
+### 3. Build & Install the Host Plugin
+From the root directory:
 
 ## Configuration for Claude Desktop
 
