@@ -99,21 +99,43 @@ Since starting up full Rhino instances as an MCP standard-I/O child process is t
 To publish a new version of the Sand Martin Python bridge to PyPI:
 
 1.  **Update Version**: Increment the `version` field in `pyproject.toml`.
-2.  **Install Build Tools**:
+2.  **Ensure Environment is Ready**:
+    Activate your virtual environment:
+    ```bash
+    source .venv/bin/activate
+    ```
+3.  **Install Build Tools**:
     ```bash
     pip install build twine
     ```
-3.  **Build the Distribution**:
+4.  **Build the Distribution**:
     ```bash
     # This generates .tar.gz and .whl files in the /dist directory
     python3 -m build
     ```
-4.  **Validate the Package**:
+5.  **Validate the Package**:
     ```bash
-    twine check dist/*
+    python3 -m twine check dist/*
     ```
-5.  **Upload to PyPI**:
+6.  **Upload to PyPI**:
     ```bash
-    # Requires a PyPI API token
-    twine upload dist/*
+    # To upload to TestPyPI first (Recommended)
+    python3 -m twine upload --repository testpypi dist/*
+
+    # To upload to the real PyPI
+    # Note: Use '__token__' as username and your PyPI API token as password
+    python3 -m twine upload dist/*
     ```
+
+## Submitting to Food4Rhino
+
+For the Grasshopper host plugin (`.gha`), follow these steps for a release:
+
+1.  **Build Release**: Build the project in Release mode (or ensure `SandMartin.Host.dll` is current).
+2.  **Package Assets**: 
+    Create a folder containing:
+    - `SandMartin.Host.gha` (Renamed from `.dll`)
+    - `Newtonsoft.Json.dll`
+    - `LICENSE`
+    - `README.txt` (Installation instructions)
+3.  **Zip and Upload**: Zip the folder and upload to Food4Rhino with the project icon and screenshots.
