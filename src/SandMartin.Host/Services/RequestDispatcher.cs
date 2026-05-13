@@ -11,10 +11,20 @@ namespace SandMartin.Host.Services
     public class RequestDispatcher
     {
         private readonly CanvasManager _canvasManager;
+        private string _authToken;
+        private bool _allowCodeInjection;
 
-        public RequestDispatcher(CanvasManager canvasManager)
+        public RequestDispatcher(CanvasManager canvasManager, string authToken, bool allowCodeInjection)
         {
             _canvasManager = canvasManager;
+            _authToken = authToken;
+            _allowCodeInjection = allowCodeInjection;
+        }
+
+        public void UpdateSecuritySettings(string token, bool allowCode)
+        {
+            if (!string.IsNullOrEmpty(token)) _authToken = token;
+            _allowCodeInjection = allowCode;
         }
 
         public async Task HandleRequest(HttpListenerContext context)
@@ -24,6 +34,16 @@ namespace SandMartin.Host.Services
 
             try
             {
+                // Security Check: Authentication
+                string authHeader = request.Headers["Authorization"];
+                if (string.IsNullOrEmpty(authHeader) || authHeader != $"Bearer {_authToken}")
+                {
+                    response.StatusCode = (int)HttpStatusCode.Unauthorized;
+                    byte[] authBuffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = "Unauthorized: Missing or invalid token." }));
+                    await response.OutputStream.WriteAsync(authBuffer, 0, authBuffer.Length);
+                    return;
+                }
+
                 string path = request.Url.AbsolutePath.ToLower().TrimEnd('/');
                 string method = request.HttpMethod.ToUpper();
                 string responseBody = "";
@@ -42,7 +62,15 @@ namespace SandMartin.Host.Services
                         {
                             case "/create":
                                 var createReq = JsonConvert.DeserializeObject<CreateNodeRequest>(body);
-                                responseBody = await _canvasManager.CreateNode(createReq);
+                                if (!_allowCodeInjection && createReq.Parameters != null && createReq.Parameters.ContainsKey("Code"))
+                                {
+                                    response.StatusCode = (int)HttpStatusCode.Forbidden;
+                                    responseBody = JsonConvert.SerializeObject(new { error = "Code injection is disabled on the Sand Martin Server component." });
+                                }
+                                else
+                                {
+                                    responseBody = await _canvasManager.CreateNode(createReq);
+                                }
                                 break;
                             case "/connection":
                                 var connReq = JsonConvert.DeserializeObject<ConnectionRequest>(body);
@@ -69,7 +97,16 @@ namespace SandMartin.Host.Services
                             var nodeId = path.Substring("/update/".Length);
                             var updateReq = JsonConvert.DeserializeObject<UpdateNodeRequest>(body) ?? new UpdateNodeRequest();
                             updateReq.NodeId = nodeId;
-                            responseBody = await _canvasManager.UpdateNode(updateReq);
+
+                            if (!_allowCodeInjection && updateReq.Parameters != null && updateReq.Parameters.ContainsKey("Code"))
+                            {
+                                response.StatusCode = (int)HttpStatusCode.Forbidden;
+                                responseBody = JsonConvert.SerializeObject(new { error = "Code injection is disabled on the Sand Martin Server component." });
+                            }
+                            else
+                            {
+                                responseBody = await _canvasManager.UpdateNode(updateReq);
+                            }
                         }
                         else
                         {
@@ -103,6 +140,7 @@ namespace SandMartin.Host.Services
             catch (Exception ex)
             {
                 response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                // Sanitize error message: only return the message, not the stack trace
                 byte[] buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new { error = ex.Message }));
                 await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
             }

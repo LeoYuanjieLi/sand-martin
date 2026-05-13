@@ -3,6 +3,7 @@ import httpx
 import json
 import logging
 import sys
+import os
 from typing import Optional, Dict, Any
 from mcp.server.fastmcp import FastMCP
 
@@ -17,22 +18,36 @@ logger = logging.getLogger("sand-martin")
 # Initialize FastMCP server
 mcp = FastMCP("sand-martin")
 
-HOST_URL = "http://localhost:8081"
+# Security: Bind to explicit loopback address
+HOST_URL = "http://127.0.0.1:8081"
+
+# Security: Read auth token from environment
+AUTH_TOKEN = os.environ.get("SAND_MARTIN_TOKEN")
 
 async def _make_request(method: str, endpoint: str, data: Optional[Dict[str, Any]] = None) -> str:
     """Helper to make requests to the Sand Martin C# Host."""
+    if not AUTH_TOKEN:
+        msg = "SAND_MARTIN_TOKEN environment variable not set. Requests will fail."
+        logger.error(msg)
+        return json.dumps({"status": "error", "message": msg})
+
     logger.info(f"Making {method} request to {endpoint}")
+    headers = {
+        "Authorization": f"Bearer {AUTH_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             url = f"{HOST_URL}{endpoint}"
             if method == "GET":
-                response = await client.get(url)
+                response = await client.get(url, headers=headers)
             elif method == "POST":
-                response = await client.post(url, json=data)
+                response = await client.post(url, json=data, headers=headers)
             elif method == "PATCH":
-                response = await client.patch(url, json=data)
+                response = await client.patch(url, json=data, headers=headers)
             elif method == "DELETE":
-                response = await client.delete(url)
+                response = await client.delete(url, headers=headers)
             else:
                 msg = f"Unsupported method: {method}"
                 logger.error(msg)

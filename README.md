@@ -56,6 +56,18 @@ Add the following to your `claude_desktop_config.json`:
     - *"Connect a Slider to the input of my component."*
     - *"Show me the current state of my canvas."*
 
+## Security
+
+Sand Martin includes built-in security features to protect your environment:
+
+- **Auth Token**: A unique token is generated every time the server starts. You must set this in your environment as `SAND_MARTIN_TOKEN`.
+- **Code Gating**: You can disable code injection at any time by setting `AllowCodeInjection` to `False` on the Grasshopper component.
+- **Localhost Only**: The server only accepts connections from `127.0.0.1`.
+
+See [SECURITY.md](SECURITY.md) for more details.
+
+> ⚠️ **Warning**: Always set the `Run` toggle to `False` on the Sand Martin component when not in use.
+
 ## Project Structure
 - `src/SandMartin.Host/`: C# source for the Grasshopper plugin.
 - `src/sand_martin/`: Python source for the MCP server.
