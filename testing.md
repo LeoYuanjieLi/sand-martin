@@ -208,3 +208,46 @@ curl -X POST http://localhost:8081/disconnect \
   "status": "success"
 }
 ```
+
+---
+
+## Unit Testing
+
+In addition to manual integration testing, the project includes automated unit tests for both the C# Host and the Python MCP Server.
+
+### Unified Test Runner
+
+You can run both C# and Python unit tests using the provided shell script:
+
+```bash
+./run_tests.sh
+```
+
+### 1. C# Host Unit Tests
+
+These tests verify the logic of the `SandMartin.Host` library in isolation (without needing a live Rhino instance).
+
+```bash
+# Run all C# tests
+dotnet test tests/SandMartin.Host.Tests/SandMartin.Host.Tests.csproj
+```
+
+### 2. Python MCP Server Unit Tests
+
+These tests verify the MCP tool logic and HTTP request formatting using mocks for the Host API.
+
+**Prerequisites:**
+Setup a virtual environment and install the dependencies:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+**Run the tests:**
+```bash
+# Set PYTHONPATH to include the src directory and run pytest
+PYTHONPATH=src pytest tests/sand_martin/test_server.py
+```
+
+*Note: The `./run_tests.sh` script will automatically activate `.venv` or `venv` if they exist.*

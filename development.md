@@ -78,12 +78,12 @@ Since starting up full Rhino instances as an MCP standard-I/O child process is t
 ### CRUD & Code Injection
 - [x] `createNode(type: str, name: str, canvasX: int, canvasY: int)`: Instantiates a component on the canvas.
 - [x] `updateNode(node_id: str, ...args)`: Update an existing component.
-- [ ] `delete_node(node_id: str)`: Removes a component.
+- [x] `delete_node(node_id: str)`: Removes a component.
 - [x] `get_canvas_state()`: Returns a JSON representation of all nodes and their IDs on the canvas.
 
 ### Orchestration (Wiring)
-- `connect_nodes(source_id: str, source_output_index: int, target_id: str, target_input_index: int)`: Wires two components together.
-- `disconnect_nodes(source_id: str, target_id: str)`: Removes wires between components.
+- [x] `connect_nodes(source_id: str, source_output_index: int, target_id: str, target_input_index: int)`: Wires two components together.
+- [x] `disconnect_nodes(source_id: str, target_id: str)`: Removes wires between components.
 
 ## Implementation Steps
 1. **Build the Rhino Listener**: Create a lightweight HTTP server inside Grasshopper that exposes the `Grasshopper.Kernel` API methods.
@@ -93,3 +93,27 @@ Since starting up full Rhino instances as an MCP standard-I/O child process is t
    - **1d. Endpoint Mapping**: Wire up the specific `/create`, `/code`, `/connection`, and `/state` routes to their respective `Grasshopper.Kernel` API equivalents.
 2. **Build Sand Martin**: Implement the external FastMCP server that registers the tools (e.g., `create_node`, `connect_nodes`) and forwards them to the listener via `requests`.
 3. **Test with LLM**: Connect Claude/Cursor to Sand Martin and prompt it to "Create a Python component that makes a circle, and wire it to a panel."
+
+## Releasing to PyPI
+
+To publish a new version of the Sand Martin Python bridge to PyPI:
+
+1.  **Update Version**: Increment the `version` field in `pyproject.toml`.
+2.  **Install Build Tools**:
+    ```bash
+    pip install build twine
+    ```
+3.  **Build the Distribution**:
+    ```bash
+    # This generates .tar.gz and .whl files in the /dist directory
+    python3 -m build
+    ```
+4.  **Validate the Package**:
+    ```bash
+    twine check dist/*
+    ```
+5.  **Upload to PyPI**:
+    ```bash
+    # Requires a PyPI API token
+    twine upload dist/*
+    ```
