@@ -1,4 +1,4 @@
-# Sand Martin 🐦
+# <img src="assets/icon.png" width="32" height="32"> Sand Martin
 
 Sand Martin is an MCP (Model Context Protocol) server that enables real-time orchestration of the Grasshopper canvas within Rhino. It allows Large Language Models (like Claude) to create components, inject Python code, and wire nodes together directly in a live Grasshopper session.
 
@@ -12,7 +12,7 @@ Sand Martin uses a **Client-Server model**:
 ## Getting Started
 
 ### 1. Requirements
-- Rhino 7 or 8 (macOS/Windows)
+- Rhino 8 (macOS/Windows)
 - .NET SDK 6.0+ (for building the Host)
 - Python 3.10+
 

@@ -24,3 +24,6 @@ dist/
 
 # Gemini
 .gemini/
+
+# packaging for food4rhino
+assets/SandMartin

@@ -68,7 +68,7 @@ namespace SandMartin.Host.Components
             base.RemovedFromDocument(document);
         }
 
-        protected override System.Drawing.Bitmap Icon => null; // You can add an icon here later
+        protected override System.Drawing.Bitmap Icon => SandMartin.Host.Resources.ResourceLoader.SandMartinIcon;
 
         public override Guid ComponentGuid => new Guid("B531B51A-932F-4DA3-8CC8-8BC9C8F9FEE6");
     }
