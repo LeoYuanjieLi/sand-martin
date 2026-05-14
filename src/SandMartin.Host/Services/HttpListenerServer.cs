@@ -26,14 +26,20 @@ namespace SandMartin.Host.Services
         public void Start()
         {
             _listener = new HttpListener();
-            _listener.Prefixes.Add($"http://localhost:{_port}/");
+            // Explicitly bind to 127.0.0.1 for better security
+            _listener.Prefixes.Add($"http://127.0.0.1:{_port}/");
             _listener.Start();
             
             _cts = new CancellationTokenSource();
             
             Task.Run(() => ListenLoop(_cts.Token));
             
-            RhinoApp.WriteLine($"SandMartin Server started on port {_port}");
+            RhinoApp.WriteLine($"SandMartin Server started on http://127.0.0.1:{_port}/");
+        }
+
+        public void UpdateSecuritySettings(string token, bool allowCode)
+        {
+            _dispatcher.UpdateSecuritySettings(token, allowCode);
         }
 
         public void Stop()
