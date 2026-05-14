@@ -22,7 +22,7 @@ namespace SandMartin.Host.Tests
             // in its method signatures, Moq fails when it can't load the Grasshopper assembly 
             // in a headless xUnit environment.
             var dummyManager = new CanvasManager();
-            var dispatcher = new RequestDispatcher(dummyManager);
+            var dispatcher = new RequestDispatcher(dummyManager, "test_token", true);
 
             // Assert
             Assert.NotNull(dispatcher);
