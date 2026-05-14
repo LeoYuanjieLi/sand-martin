@@ -94,7 +94,24 @@ Since starting up full Rhino instances as an MCP standard-I/O child process is t
 2. **Build Sand Martin**: Implement the external FastMCP server that registers the tools (e.g., `create_node`, `connect_nodes`) and forwards them to the listener via `requests`.
 3. **Test with LLM**: Connect Claude/Cursor to Sand Martin and prompt it to "Create a Python component that makes a circle, and wire it to a panel."
 
-## Releasing to PyPI
+## Development Workflow
+
+### Pre-commit Hook
+To ensure code quality and prevent regressions, we use the `pre-commit` framework. This is mandatory for all contributors.
+
+To set up the hook locally:
+1. Install the dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Install the git hook:
+   ```bash
+   pre-commit install
+   ```
+
+The hook will now run the full test suite (`run_tests.sh`) before every commit.
+
+### Releasing to PyPI
 
 To publish a new version of the Sand Martin Python bridge to PyPI:
 
