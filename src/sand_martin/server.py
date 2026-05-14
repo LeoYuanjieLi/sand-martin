@@ -60,6 +60,26 @@ def _get_auth_token() -> Optional[str]:
 
 async def _make_request(method: str, endpoint: str, data: Optional[Dict[str, Any]] = None) -> str:
     """Helper to make requests to the Sand Martin C# Host."""
+    
+    async def _execute_request(current_token: str):
+        headers = {
+            "Authorization": f"Bearer {current_token}",
+            "Content-Type": "application/json"
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            url = f"{HOST_URL}{endpoint}"
+            if method == "GET":
+                return await client.get(url, headers=headers)
+            elif method == "POST":
+                return await client.post(url, json=data, headers=headers)
+            elif method == "PATCH":
+                return await client.patch(url, json=data, headers=headers)
+            elif method == "DELETE":
+                return await client.delete(url, headers=headers)
+            else:
+                raise ValueError(f"Unsupported method: {method}")
+
+    # 1. Hot Discovery: Always get the latest token from disk/env
     token = _get_auth_token()
     if not token:
         msg = (
@@ -71,36 +91,34 @@ async def _make_request(method: str, endpoint: str, data: Optional[Dict[str, Any
         return json.dumps({"status": "error", "message": msg})
 
     logger.info(f"Making {method} request to {endpoint}")
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-            
-            if method == "GET":
-                response = await client.get(url, headers=headers)
-            elif method == "POST":
-                response = await client.post(url, json=data, headers=headers)
-            elif method == "PATCH":
-                response = await client.patch(url, json=data, headers=headers)
-            elif method == "DELETE":
-                response = await client.delete(url, headers=headers)
+    
+    try:
+        # 2. Try the request
+        response = await _execute_request(token)
+        
+        # 3. If unauthorized (401), the token might have changed (Rhino restarted).
+        # Refresh and retry ONCE.
+        if response.status_code == 401:
+            logger.warning("Unauthorized (401). Token may have changed. Refreshing...")
+            new_token = _get_auth_token()
+            if new_token and new_token != token:
+                logger.info("Found new token. Retrying request...")
+                response = await _execute_request(new_token)
             else:
-                msg = f"Unsupported method: {method}"
-                logger.error(msg)
-                return json.dumps({"status": "error", "message": msg})
+                logger.error("Token refresh failed or token remains invalid.")
 
-            logger.info(f"Received response: {response.status_code}")
-            response.raise_for_status()
-            return response.text
-        except httpx.HTTPError as e:
-            msg = f"HTTP error occurred: {str(e)}"
-            logger.error(msg)
-            return json.dumps({"status": "error", "message": msg})
-        except Exception as e:
-            msg = f"An error occurred: {str(e)}"
-            logger.error(msg)
-            return json.dumps({"status": "error", "message": msg})
-            return json.dumps({"status": "error", "message": msg})
+        logger.info(f"Received response: {response.status_code}")
+        response.raise_for_status()
+        return response.text
+        
+    except httpx.HTTPError as e:
+        msg = f"HTTP error occurred: {str(e)}"
+        logger.error(msg)
+        return json.dumps({"status": "error", "message": msg})
+    except Exception as e:
+        msg = f"An error occurred: {str(e)}"
+        logger.error(msg)
+        return json.dumps({"status": "error", "message": msg})
 
 @mcp.tool()
 async def get_canvas_state() -> str:
