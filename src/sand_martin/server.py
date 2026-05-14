@@ -19,7 +19,7 @@ logger = logging.getLogger("sand-martin")
 # Initialize FastMCP server
 mcp = FastMCP(
     "sand-martin",
-    description="""
+    instructions="""
     Securely orchestrates the Grasshopper canvas within Rhino using the Sand Martin Host.
     
     SECURITY & AUTHENTICATION:
