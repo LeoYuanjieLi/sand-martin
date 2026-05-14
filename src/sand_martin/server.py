@@ -4,6 +4,7 @@ import json
 import logging
 import sys
 import os
+import tempfile
 from typing import Optional, Dict, Any
 from mcp.server.fastmcp import FastMCP
 
@@ -21,25 +22,40 @@ mcp = FastMCP("sand-martin")
 # Security: Bind to explicit loopback address
 HOST_URL = "http://127.0.0.1:8081"
 
-# Security: Read auth token from environment
-AUTH_TOKEN = os.environ.get("SAND_MARTIN_TOKEN")
+def _get_auth_token() -> Optional[str]:
+    """Retrieves the auth token from environment variable or temp file."""
+    # 1. Check environment variable
+    token = os.environ.get("SAND_MARTIN_TOKEN")
+    if token:
+        return token
+    
+    # 2. Check temporary file for auto-discovery
+    token_path = os.path.join(tempfile.gettempdir(), "sand_martin.token")
+    if os.path.exists(token_path):
+        try:
+            with open(token_path, "r") as f:
+                return f.read().strip()
+        except Exception as e:
+            logger.warning(f"Failed to read token file: {e}")
+            
+    return None
 
 async def _make_request(method: str, endpoint: str, data: Optional[Dict[str, Any]] = None) -> str:
     """Helper to make requests to the Sand Martin C# Host."""
-    if not AUTH_TOKEN:
-        msg = "SAND_MARTIN_TOKEN environment variable not set. Requests will fail."
+    token = _get_auth_token()
+    if not token:
+        msg = "SAND_MARTIN_TOKEN not set and no token file found. Requests will fail."
         logger.error(msg)
         return json.dumps({"status": "error", "message": msg})
 
-    logger.info(f"Making {method} request to {endpoint}")
-    headers = {
-        "Authorization": f"Bearer {AUTH_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             url = f"{HOST_URL}{endpoint}"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+            
             if method == "GET":
                 response = await client.get(url, headers=headers)
             elif method == "POST":
@@ -63,6 +79,7 @@ async def _make_request(method: str, endpoint: str, data: Optional[Dict[str, Any
         except Exception as e:
             msg = f"An error occurred: {str(e)}"
             logger.error(msg)
+            return json.dumps({"status": "error", "message": msg})
             return json.dumps({"status": "error", "message": msg})
 
 @mcp.tool()

@@ -58,6 +58,7 @@ namespace SandMartin.Host.Components
                 
                 _server.Start();
                 _isRunning = true;
+                WriteTokenToFile(token);
                 Message = allowCode ? "Running (Insecure Mode)" : "Running (Secure Mode)";
             }
             else if (run && _isRunning)
@@ -70,6 +71,7 @@ namespace SandMartin.Host.Components
             {
                 _server?.Stop();
                 _isRunning = false;
+                DeleteTokenFile();
                 Message = "Stopped";
             }
             else if (!run && !_isRunning)
@@ -78,6 +80,32 @@ namespace SandMartin.Host.Components
             }
             
             DA.SetData(0, _isRunning ? $"Server is running on port 8081. Code injection: {allowCode}" : "Server is stopped");
+        }
+
+        private string GetTokenFilePath()
+        {
+            return System.IO.Path.Combine(System.IO.Path.GetTempPath(), "sand_martin.token");
+        }
+
+        private void WriteTokenToFile(string token)
+        {
+            try {
+                System.IO.File.WriteAllText(GetTokenFilePath(), token);
+            } catch (Exception) {
+                // Ignore errors
+            }
+        }
+
+        private void DeleteTokenFile()
+        {
+            try {
+                string path = GetTokenFilePath();
+                if (System.IO.File.Exists(path)) {
+                    System.IO.File.Delete(path);
+                }
+            } catch (Exception) {
+                // Ignore errors
+            }
         }
 
         private string GenerateAuthToken()
