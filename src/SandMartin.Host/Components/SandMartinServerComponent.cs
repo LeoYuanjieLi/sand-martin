@@ -59,13 +59,13 @@ namespace SandMartin.Host.Components
                 _server.Start();
                 _isRunning = true;
                 WriteTokenToFile(token);
-                Message = allowCode ? "Running (Insecure Mode)" : "Running (Secure Mode)";
+                Message = "Running";
             }
             else if (run && _isRunning)
             {
                 // Update code injection flag if changed while running
                 _server?.UpdateSecuritySettings(null, allowCode);
-                Message = allowCode ? "Running (Insecure Mode)" : "Running (Secure Mode)";
+                Message = "Running";
             }
             else if (!run && _isRunning)
             {

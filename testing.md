@@ -15,7 +15,9 @@ This command fetches the current state of the Grasshopper canvas, listing all co
 
 ```bash
 # Request
-curl -X GET http://localhost:8081/state
+# Replace YOUR_TOKEN with the token from the sand_martin.token file.
+curl -X GET http://127.0.0.1:8081/state \
+-H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 **Expected Response (Example):**
@@ -29,13 +31,45 @@ If there are components on the canvas, they will be listed in the JSON response.
 
 ---
 
-### 2. Test the `/create` Endpoint
+### 2. Test the `/node/{nodeId}` Endpoint
+
+This command fetches detailed information about a specific component, including dynamic parameters like slider values, toggle states, and script code.
+
+**Important:** Replace `"YOUR_NODE_ID"` with an actual `id` from the `/state` response and `"YOUR_TOKEN"` with your auth token.
+
+```bash
+# Request
+curl -X GET http://127.0.0.1:8081/node/YOUR_NODE_ID \
+-H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Expected Response (Example for a Slider):**
+```json
+{
+  "id": "159f407e-675a-48aa-93bd-41191f6d622f",
+  "name": "Number Slider",
+  "nickname": "Probability",
+  "type": "GH_NumberSlider",
+  "x": 0.0,
+  "y": 400.0,
+  "parameters": {
+    "CurrentValue": 1.0
+  },
+  "inputs": [],
+  "outputs": []
+}
+```
+
+---
+
+### 3. Test the `/create` Endpoint
 
 This command creates a new "Panel" component on the canvas at coordinates (100, 100) and sets its initial text value.
 
 ```bash
 # Request
-curl -X POST http://localhost:8081/create \
+curl -X POST http://127.0.0.1:8081/create \
+-H "Authorization: Bearer YOUR_TOKEN" \
 -H "Content-Type: application/json" \
 -d '{
   "type": "Panel",
@@ -60,7 +94,7 @@ After running this, you should see a new Panel named "MyTestPanel" appear on you
 
 ---
 
-### 3. Test the `/update/{nodeId}` Endpoint
+### 4. Test the `/update/{nodeId}` Endpoint
 
 This command updates the component created in the previous step. It changes its name (nickname) and moves it to a new position on the canvas.
 
@@ -68,8 +102,9 @@ This command updates the component created in the previous step. It changes its 
 
 ```bash
 # Request
-# Remember to replace YOUR_NODE_ID with the actual ID from the /create step.
-curl -X PATCH http://localhost:8081/update/YOUR_NODE_ID \
+# Remember to replace YOUR_NODE_ID with the actual ID and YOUR_TOKEN with your token.
+curl -X PATCH http://127.0.0.1:8081/update/YOUR_NODE_ID \
+-H "Authorization: Bearer YOUR_TOKEN" \
 -H "Content-Type: application/json" \
 -d '{
   "name": "UpdatedPanel",
@@ -89,7 +124,7 @@ After running this, the panel on your canvas should move to the new coordinates 
 
 ---
 
-### 4. Advanced Example: Creating a C# Script Component
+### 5. Advanced Example: Creating a C# Script Component
 
 This command creates a **C# Script** component and injects code into it. The script generates a 5x5x5 grid of spheres with slightly varying random radii.
 
@@ -97,7 +132,8 @@ This command creates a **C# Script** component and injects code into it. The scr
 
 ```bash
 # Request
-curl -X POST http://localhost:8081/create \
+curl -X POST http://127.0.0.1:8081/create \
+-H "Authorization: Bearer YOUR_TOKEN" \
 -H "Content-Type: application/json" \
 -d '{
   "type": "CSharpComponent",
@@ -105,7 +141,7 @@ curl -X POST http://localhost:8081/create \
   "canvasX": 250,
   "canvasY": 250,
   "parameters": {
-    "Code": "using System;\nusing System.Collections.Generic;\nusing Rhino.Geometry;\n\nint seed = 42;\nif (x != null) { Int32.TryParse(x.ToString(), out seed); }\n\nvar rand = new Random(seed);\nvar spheres = new List<Sphere>();\n\ndouble spacing = 5.0;\ndouble baseRadius = 2.0;\ndouble variation = 0.5;\n\nfor (int i = 0; i < 5; i++)\n{\n    for (int j = 0; j < 5; j++)\n    {\n        for (int k = 0; k < 5; k++)\n        {\n            var pt = new Point3d(i * spacing, j * spacing, k * spacing);\n            // Radius varies between (baseRadius - variation) and (baseRadius + variation)\n            double currentRadius = baseRadius + (rand.NextDouble() * 2 * variation - variation);\n            spheres.Add(new Sphere(pt, currentRadius));\n        }\n    }\n}\n\na = spheres;"
+    "Code": "using System;\\nusing System.Collections.Generic;\\nusing Rhino.Geometry;\\n\\nint seed = 42;\\nif (x != null) { Int32.TryParse(x.ToString(), out seed); }\\n\\nvar rand = new Random(seed);\\nvar spheres = new List<Sphere>();\\n\\ndouble spacing = 5.0;\\ndouble baseRadius = 2.0;\\ndouble variation = 0.5;\\n\\nfor (int i = 0; i < 5; i++)\\n{\\n    for (int j = 0; j < 5; j++)\\n    {\\n        for (int k = 0; k < 5; k++)\\n        {\\n            var pt = new Point3d(i * spacing, j * spacing, k * spacing);\\n            // Radius varies between (baseRadius - variation) and (baseRadius + variation)\\n            double currentRadius = baseRadius + (rand.NextDouble() * 2 * variation - variation);\\n            spheres.Add(new Sphere(pt, currentRadius));\\n        }\\n    }\\n}\\n\\na = spheres;"
   }
 }'
 ```
@@ -114,7 +150,7 @@ After creating this component, you can manually add a "Number Slider" component 
 
 ---
 
-### 5. Advanced Example: Updating the C# Script Component
+### 6. Advanced Example: Updating the C# Script Component
 
 This command uses the `/update/{nodeId}` endpoint to completely overwrite the C# code in the component you just created. Instead of drawing a grid of spheres, it updates the code to draw a grid of slightly varying **BoundingBoxes (Cubes)**.
 
@@ -122,12 +158,13 @@ This command uses the `/update/{nodeId}` endpoint to completely overwrite the C#
 
 ```bash
 # Request
-curl -X PATCH http://localhost:8081/update/4c62be40-99ef-422f-a417-f54ca8556142 \
+curl -X PATCH http://127.0.0.1:8081/update/YOUR_SCRIPT_NODE_ID \
+-H "Authorization: Bearer YOUR_TOKEN" \
 -H "Content-Type: application/json" \
 -d '{
   "name": "Random Cubes Grid",
   "parameters": {
-    "Code": "using System;\nusing System.Collections.Generic;\nusing Rhino.Geometry;\n\nint seed = 42;\nif (x != null) { Int32.TryParse(x.ToString(), out seed); }\n\nvar rand = new Random(seed);\nvar cubes = new List<Box>();\n\ndouble spacing = 5.0;\ndouble baseSize = 2.0;\ndouble variation = 0.5;\n\nfor (int i = 0; i < 5; i++)\n{\n    for (int j = 0; j < 5; j++)\n    {\n        for (int k = 0; k < 5; k++)\n        {\n            // Center point of the cube\n            var center = new Point3d(i * spacing, j * spacing, k * spacing);\n            \n            // Size varies between (baseSize - variation) and (baseSize + variation)\n            double halfSize = (baseSize + (rand.NextDouble() * 2 * variation - variation)) / 2.0;\n            \n            // Create a BoundingBox from the corner points\n            var minPt = new Point3d(center.X - halfSize, center.Y - halfSize, center.Z - halfSize);\n            var maxPt = new Point3d(center.X + halfSize, center.Y + halfSize, center.Z + halfSize);\n            var bbox = new BoundingBox(minPt, maxPt);\n            \n            cubes.Add(new Box(bbox));\n        }\n    }\n}\n\na = cubes;"
+    "Code": "using System;\\nusing System.Collections.Generic;\\nusing Rhino.Geometry;\\n\\nint seed = 42;\\nif (x != null) { Int32.TryParse(x.ToString(), out seed); }\\n\\nvar rand = new Random(seed);\\nvar cubes = new List<Box>();\\n\\ndouble spacing = 5.0;\\ndouble baseSize = 2.0;\\ndouble variation = 0.5;\\n\\nfor (int i = 0; i < 5; i++)\\n{\\n    for (int j = 0; j < 5; j++)\\n    {\\n        for (int k = 0; k < 5; k++)\\n        {\\n            // Center point of the cube\\n            var center = new Point3d(i * spacing, j * spacing, k * spacing);\\n            \\n            // Size varies between (baseSize - variation) and (baseSize + variation)\\n            double halfSize = (baseSize + (rand.NextDouble() * 2 * variation - variation)) / 2.0;\\n            \\n            // Create a BoundingBox from the corner points\\n            var minPt = new Point3d(center.X - halfSize, center.Y - halfSize, center.Z - halfSize);\\n            var maxPt = new Point3d(center.X + halfSize, center.Y + halfSize, center.Z + halfSize);\\n            var bbox = new BoundingBox(minPt, maxPt);\\n            \\n            cubes.Add(new Box(bbox));\\n        }\\n    }\\n}\\n\\na = cubes;"
   }
 }'
 ```
@@ -136,7 +173,7 @@ After running this, the script node's name will change to "Random Cubes Grid", t
 
 ---
 
-### 6. Test the `/node/{nodeId}` DELETE Endpoint
+### 7. Test the `/node/{nodeId}` DELETE Endpoint
 
 This command removes a component from the canvas.
 
@@ -144,8 +181,9 @@ This command removes a component from the canvas.
 
 ```bash
 # Request
-# Remember to replace YOUR_NODE_ID with the actual ID.
-curl -X DELETE http://localhost:8081/node/YOUR_NODE_ID
+# Remember to replace YOUR_NODE_ID with the actual ID and YOUR_TOKEN with your token.
+curl -X DELETE http://127.0.0.1:8081/node/YOUR_NODE_ID \
+-H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 **Expected Response (Example):**
@@ -159,7 +197,7 @@ After running this, the component with the specified ID should disappear from yo
 
 ---
 
-### 7. Test the `/connection` Endpoint
+### 8. Test the `/connection` Endpoint
 
 This command wires two components together. It connects a source output to a target input.
 
@@ -167,12 +205,13 @@ This command wires two components together. It connects a source output to a tar
 
 ```bash
 # Request
-curl -X POST http://localhost:8081/connection \
+curl -X POST http://127.0.0.1:8081/connection \
+-H "Authorization: Bearer YOUR_TOKEN" \
 -H "Content-Type: application/json" \
 -d '{
-  "source_id": "2edf0867-8559-47b6-91a7-e50cb8fa0d7b",
+  "source_id": "YOUR_SOURCE_ID",
   "source_output_index": 0,
-  "target_id": "5f96b403-8126-4301-bfee-814a7debf295",
+  "target_id": "YOUR_TARGET_ID",
   "target_input_index": 0
 }'
 ```
@@ -186,7 +225,7 @@ curl -X POST http://localhost:8081/connection \
 
 ---
 
-### 8. Test the `/disconnect` Endpoint
+### 9. Test the `/disconnect` Endpoint
 
 This command removes all wires between two specific components.
 
@@ -194,11 +233,12 @@ This command removes all wires between two specific components.
 
 ```bash
 # Request
-curl -X POST http://localhost:8081/disconnect \
+curl -X POST http://127.0.0.1:8081/disconnect \
+-H "Authorization: Bearer YOUR_TOKEN" \
 -H "Content-Type: application/json" \
 -d '{
-  "source_id": "2edf0867-8559-47b6-91a7-e50cb8fa0d7b",
-  "target_id": "5f96b403-8126-4301-bfee-814a7debf295"
+  "source_id": "YOUR_SOURCE_ID",
+  "target_id": "YOUR_TARGET_ID"
 }'
 ```
 

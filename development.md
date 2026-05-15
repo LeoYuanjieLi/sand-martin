@@ -80,10 +80,33 @@ Since starting up full Rhino instances as an MCP standard-I/O child process is t
 - [x] `updateNode(node_id: str, ...args)`: Update an existing component.
 - [x] `delete_node(node_id: str)`: Removes a component.
 - [x] `get_canvas_state()`: Returns a JSON representation of all nodes and their IDs on the canvas.
+- [ ] `get_node_details(node_id: str)`: Returns detailed dynamic state (e.g., slider values, script code) for a specific component.
 
 ### Orchestration (Wiring)
 - [x] `connect_nodes(source_id: str, source_output_index: int, target_id: str, target_input_index: int)`: Wires two components together.
 - [x] `disconnect_nodes(source_id: str, target_id: str)`: Removes wires between components.
+
+## Grasshopper Component Reference
+
+When using `create_node`, the `type` parameter must match the component's internal name or type name. Common components include:
+
+| Category | Component Name / Type | Description |
+| :--- | :--- | :--- |
+| **Input** | `GH_NumberSlider` | A numeric slider for dynamic input. |
+| **Input** | `GH_BooleanToggle` | A true/false toggle. |
+| **Input** | `Panel` | A text panel for input or display. |
+| **Script** | `CSharpComponent` | A C# script component. |
+| **Script** | `Python2Component` | A Python 2.7 (IronPython) component. |
+| **Script** | `Python3Component` | A Python 3 (Rhino 8) component. |
+| **Geometry** | `Circle` | Creates a circle. |
+| **Geometry** | `Line` | Creates a line between two points. |
+| **Geometry** | `Point` | Creates a point. |
+
+## Basic Agent System Prompt
+
+To effectively use the Sand Martin MCP, the agent should follow this strategic loop:
+
+> **System Instruction**: The agent should try to use the `get_canvas_state` endpoint and the `get_node_details` endpoint (once implemented) to read the current canvas information and understand user intent. It should outline a "creation map" (logical steps for components and connections) and then start using `create_node`, `update_node`, or `connect_nodes` to make changes iteratively. Always verify the canvas state after major modifications.
 
 ## Implementation Steps
 1. **Build the Rhino Listener**: Create a lightweight HTTP server inside Grasshopper that exposes the `Grasshopper.Kernel` API methods.

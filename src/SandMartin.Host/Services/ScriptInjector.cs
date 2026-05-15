@@ -31,6 +31,57 @@ namespace SandMartin.Host.Services
             }
         }
 
+        public static string GetComponentCode(IGH_DocumentObject obj)
+        {
+            if (obj == null) return null;
+
+            try
+            {
+                // Try Rhino 8
+                var type = obj.GetType();
+                var contextField = type.GetField("Context", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (contextField != null)
+                {
+                    var contextObj = contextField.GetValue(obj);
+                    if (contextObj != null)
+                    {
+                        var scriptProp = contextObj.GetType().GetProperty("Script");
+                        var scriptObj = scriptProp?.GetValue(contextObj);
+                        if (scriptObj != null)
+                        {
+                            var textProp = scriptObj.GetType().GetProperty("Text");
+                            if (textProp != null) return textProp.GetValue(scriptObj) as string;
+                        }
+
+                        var ctxGetTextMethod = contextObj.GetType().GetMethod("GetText");
+                        if (ctxGetTextMethod != null) return ctxGetTextMethod.Invoke(contextObj, null) as string;
+                    }
+                }
+
+                // Try direct Code property
+                var mainCodeProp = type.GetProperty("Code");
+                if (mainCodeProp != null && mainCodeProp.PropertyType == typeof(string))
+                {
+                    return mainCodeProp.GetValue(obj) as string;
+                }
+
+                // Try legacy ScriptSource
+                var scriptSourceProp = type.GetProperty("ScriptSource");
+                var scriptSource = scriptSourceProp?.GetValue(obj);
+                if (scriptSource != null)
+                {
+                    var scriptCodeProp = scriptSource.GetType().GetProperty("ScriptCode");
+                    if (scriptCodeProp != null) return scriptCodeProp.GetValue(scriptSource) as string;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Error in GetComponentCode: {ex.Message}");
+            }
+
+            return null;
+        }
+
         private static bool TryRhino8Injection(IGH_DocumentObject obj, string code)
         {
             var type = obj.GetType();

@@ -48,9 +48,21 @@ namespace SandMartin.Host.Services
                 string method = request.HttpMethod.ToUpper();
                 string responseBody = "";
 
-                if (method == "GET" && path == "/state")
+                if (method == "GET")
                 {
-                    responseBody = await _canvasManager.GetCanvasState();
+                    if (path == "/state")
+                    {
+                        responseBody = await _canvasManager.GetCanvasState();
+                    }
+                    else if (path.StartsWith("/node/"))
+                    {
+                        var nodeId = path.Substring("/node/".Length);
+                        responseBody = await _canvasManager.GetNodeDetails(nodeId);
+                    }
+                    else
+                    {
+                        response.StatusCode = (int)HttpStatusCode.NotFound;
+                    }
                 }
                 else if (method == "POST")
                 {
