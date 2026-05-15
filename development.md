@@ -63,7 +63,11 @@ src/SandMartin.Host/
 ├── Services/
 │   ├── HttpListenerServer.cs       # Background HTTP listener management
 │   ├── RequestDispatcher.cs        # Route mapping & UI Thread marshaling
-│   └── CanvasManager.cs            # Grasshopper.Kernel API orchestration
+│   ├── CanvasManager.cs            # Facade for Grasshopper operations
+│   ├── GrasshopperServiceBase.cs   # Shared logic for service managers
+│   ├── NodeManager.cs              # Node-level CRUD operations
+│   ├── ConnectionManager.cs        # Component wiring logic
+│   └── StateManager.cs             # Canvas-wide state retrieval
 └── Scripts/
     └── postbuild.sh                # Script to deploy .gha to Rhino folder
 ```
@@ -77,10 +81,10 @@ Since starting up full Rhino instances as an MCP standard-I/O child process is t
 
 ### CRUD & Code Injection
 - [x] `createNode(type: str, name: str, canvasX: int, canvasY: int)`: Instantiates a component on the canvas.
-- [x] `updateNode(node_id: str, ...args)`: Update an existing component.
+- [x] `updateNode(node_id: str, ...args)`: Update an existing component (e.g., position, name, or public writable properties). Returns errors if a property is not found or is read-only.
 - [x] `delete_node(node_id: str)`: Removes a component.
 - [x] `get_canvas_state()`: Returns a JSON representation of all nodes and their IDs on the canvas.
-- [ ] `get_node_details(node_id: str)`: Returns detailed dynamic state (e.g., slider values, script code) for a specific component.
+- [x] `get_node_details(node_id: str)`: Returns detailed dynamic state for a specific component. Uses reflection to discover all readable primitive properties, returned in a compact `{"v": value, "r": readonly}` format to save tokens.
 
 ### Orchestration (Wiring)
 - [x] `connect_nodes(source_id: str, source_output_index: int, target_id: str, target_input_index: int)`: Wires two components together.
