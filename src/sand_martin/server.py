@@ -127,6 +127,17 @@ async def get_canvas_state() -> str:
     return await _make_request("GET", "/state")
 
 @mcp.tool()
+async def get_node_details(node_id: str) -> str:
+    """
+    Returns detailed dynamic state (e.g., slider values, script code) for a specific component.
+    
+    Args:
+        node_id: The unique ID (GUID) of the node to inspect.
+    """
+    logger.info(f"Tool called: get_node_details (node_id={node_id})")
+    return await _make_request("GET", f"/node/{node_id}")
+
+@mcp.tool()
 async def create_node(
     type: str, 
     name: str, 

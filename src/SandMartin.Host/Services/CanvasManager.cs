@@ -90,6 +90,104 @@ namespace SandMartin.Host.Services
             return tcs.Task;
         }
 
+        public virtual Task<string> GetNodeDetails(string nodeId)
+        {
+            try {
+                if (IsRunningInRhino())
+                {
+                    return GetRhinoNodeDetails(nodeId);
+                }
+            } catch {
+            }
+
+            return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "No active Grasshopper document" }));
+        }
+
+        private Task<string> GetRhinoNodeDetails(string nodeId)
+        {
+            var tcs = new TaskCompletionSource<string>();
+
+            Rhino.RhinoApp.InvokeOnUiThread(new Action(() => {
+                try {
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+                    if (doc == null) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = "No active Grasshopper document" }));
+                        return;
+                    }
+
+                    if (!Guid.TryParse(nodeId, out Guid guid)) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = "Invalid node ID format" }));
+                        return;
+                    }
+
+                    var obj = doc.FindObject(guid, true);
+                    if (obj == null) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = "Node not found" }));
+                        return;
+                    }
+
+                    var nodeInfo = new NodeInfo {
+                        Id = obj.InstanceGuid.ToString(),
+                        Name = obj.Name,
+                        Nickname = obj.NickName,
+                        Type = obj.GetType().Name,
+                        X = obj.Attributes.Pivot.X,
+                        Y = obj.Attributes.Pivot.Y
+                    };
+
+                    // Extract type-specific parameters
+                    if (obj is Grasshopper.Kernel.Special.GH_NumberSlider slider)
+                    {
+                        nodeInfo.Parameters["CurrentValue"] = slider.CurrentValue;
+                    }
+                    else if (obj is Grasshopper.Kernel.Special.GH_BooleanToggle toggle)
+                    {
+                        nodeInfo.Parameters["Value"] = toggle.Value;
+                    }
+                    else if (obj is Grasshopper.Kernel.Special.GH_Panel panel)
+                    {
+                        nodeInfo.Parameters["UserText"] = panel.UserText;
+                    }
+
+                    // Extract script code if applicable
+                    var code = ScriptInjector.GetComponentCode(obj);
+                    if (code != null)
+                    {
+                        nodeInfo.Parameters["Code"] = code;
+                    }
+
+                    if (obj is IGH_Component component)
+                    {
+                        for (int i = 0; i < component.Params.Input.Count; i++)
+                        {
+                            var p = component.Params.Input[i];
+                            var paramInfo = new ParameterInfo { Name = p.Name, Nickname = p.NickName, Index = i };
+                            foreach (var source in p.Sources)
+                            {
+                                paramInfo.Connections.Add(new ConnectionInfo {
+                                    TargetId = source.Attributes.GetTopLevel.DocObject.InstanceGuid.ToString(),
+                                    TargetIndex = 0 
+                                });
+                            }
+                            nodeInfo.Inputs.Add(paramInfo);
+                        }
+
+                        for (int i = 0; i < component.Params.Output.Count; i++)
+                        {
+                            var p = component.Params.Output[i];
+                            nodeInfo.Outputs.Add(new ParameterInfo { Name = p.Name, Nickname = p.NickName, Index = i });
+                        }
+                    }
+
+                    tcs.SetResult(JsonConvert.SerializeObject(nodeInfo));
+                } catch (Exception ex) {
+                    tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = ex.Message }));
+                }
+            }));
+
+            return tcs.Task;
+        }
+
         public virtual Task<string> CreateNode(CreateNodeRequest request)
         {
             try {
