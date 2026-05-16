@@ -53,7 +53,8 @@ Add the following to your `claude_desktop_config.json`:
 2.  **Start the Server**: Drag the "Sand Martin Server" component onto the canvas and set the **Run** toggle to `True`.
 3.  **Authenticate the Agent**: 
     -   **Auto-Discovery (Default)**: The Python bridge automatically reads the security token from your system's temporary directory. No manual setup is usually required!
-    -   **Manual Fallback**: If auto-discovery fails, a unique token is printed to the Rhino Command Line. You can paste this directly into the chat: *"Here is my token: <TOKEN>"*.
+    -   **Manual Fallback**: If auto-discovery fails, a unique token is printed to the Rhino Command Line. 
+    -   **Agent Behavior**: If the agent cannot find the token, it will explicitly ask you to copy it from the Rhino Command History (look for "SAND MARTIN SECURITY TOKEN"). You can then paste it directly into the chat.
 4.  **Orchestrate**: You can now ask Claude to:
     - *"Create a Python component that calculates a Fibonacci sequence."*
     - *"Connect a Slider to the input of my component."*

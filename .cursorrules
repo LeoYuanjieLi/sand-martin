@@ -1,0 +1,4 @@
+The Sand Martin Host in Rhino requires a 32-character Bearer token.
+
+- If the MCP tools return a 401 error or if you cannot find the token in the system temp directory (`sand_martin.token`), ask the user for the "SAND MARTIN SECURITY TOKEN" from the Rhino Command History.
+- Save the token to the system temp directory as `sand_martin.token` once received.

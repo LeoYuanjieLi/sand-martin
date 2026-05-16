@@ -110,7 +110,7 @@ When using `create_node`, the `type` parameter must match the component's intern
 
 To effectively use the Sand Martin MCP, the agent should follow this strategic loop:
 
-> **System Instruction**: The agent should try to use the `get_canvas_state` endpoint and the `get_node_details` endpoint (once implemented) to read the current canvas information and understand user intent. It should outline a "creation map" (logical steps for components and connections) and then start using `create_node`, `update_node`, or `connect_nodes` to make changes iteratively. Always verify the canvas state after major modifications.
+> **System Instruction**: The agent should first ensure it has an active authentication token. If the user hasn't provided one or if the tools return an authentication error, the agent **MUST ask the user to copy the token from the Rhino Command History** (look for "SAND MARTIN SECURITY TOKEN"). Once authenticated, the agent should use `get_canvas_state` and `get_node_details` to read the current canvas information and understand user intent. It should outline a "creation map" (logical steps for components and connections) and then start using `create_node`, `update_node`, or `connect_nodes` to make changes iteratively. Always verify the canvas state after major modifications.
 
 ## Implementation Steps
 1. **Build the Rhino Listener**: Create a lightweight HTTP server inside Grasshopper that exposes the `Grasshopper.Kernel` API methods.
