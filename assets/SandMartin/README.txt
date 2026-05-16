@@ -1,4 +1,4 @@
-# Sand Martin (v0.2.0) 🐦
+# Sand Martin (v0.2.1) 🐦
 
 Sand Martin is a real-time LLM orchestration host for Grasshopper. It enables Large Language Models to interact directly with the Grasshopper canvas via the Model Context Protocol (MCP).
 

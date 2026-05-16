@@ -1,6 +1,6 @@
 [project]
 name = "sand-martin"
-version = "0.2.0"
+version = "0.2.1"
 description = "An MCP server for generating and managing Grasshopper Python components"
 readme = "README.md"
 authors = [

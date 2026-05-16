@@ -5,7 +5,7 @@
     <NoWarn>$(NoWarn);NU1701</NoWarn>
     <AssemblyTitle>SandMartin.Host</AssemblyTitle>
     <Description>Grasshopper HTTP Server for MCP</Description>
-    <Version>0.1.2</Version>
+    <Version>0.2.1</Version>
     <Platforms>AnyCPU;x64</Platforms>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
