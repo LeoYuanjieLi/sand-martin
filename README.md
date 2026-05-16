@@ -50,8 +50,11 @@ Add the following to your `claude_desktop_config.json`:
 ## Usage
 
 1.  **Start Rhino** and open **Grasshopper**.
-2.  Launch **Claude Desktop**.
-3.  You can now ask Claude to:
+2.  **Start the Server**: Drag the "Sand Martin Server" component onto the canvas and set the **Run** toggle to `True`.
+3.  **Authenticate the Agent**: 
+    -   **Auto-Discovery (Default)**: The Python bridge automatically reads the security token from your system's temporary directory. No manual setup is usually required!
+    -   **Manual Fallback**: If auto-discovery fails, a unique token is printed to the Rhino Command Line. You can paste this directly into the chat: *"Here is my token: <TOKEN>"*.
+4.  **Orchestrate**: You can now ask Claude to:
     - *"Create a Python component that calculates a Fibonacci sequence."*
     - *"Connect a Slider to the input of my component."*
     - *"Show me the current state of my canvas."*

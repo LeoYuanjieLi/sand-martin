@@ -122,4 +122,13 @@ namespace SandMartin.Host.Models
         [JsonProperty("target_index")]
         public int TargetIndex { get; set; }
     }
+
+    public class PropertyDetail
+    {
+        [JsonProperty("v")]
+        public object Value { get; set; }
+
+        [JsonProperty("r")]
+        public bool IsReadOnly { get; set; }
+    }
 }
