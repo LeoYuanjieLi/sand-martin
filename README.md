@@ -4,8 +4,14 @@ Sand Martin is an MCP (Model Context Protocol) server that enables real-time orc
 
 ## Demo
 
-![Sand Martin Demo 1](assets/gif1.gif)
-![Sand Martin Demo 2](assets/gif2.gif)
+### 1. Authenticate with the Agent
+![Sand Martin Auth](assets/gif1-auth-mcp.gif)
+
+### 2. Update Slider Values
+![Update Slider](assets/gif2-update-slider-component.gif)
+
+### 3. Inject and Run Code
+![Update Code](assets/gif3-update-code-component.gif)
 
 ## Architecture
 
