@@ -2,6 +2,7 @@ import pytest
 import respx
 import httpx
 import json
+import os
 from sand_martin.server import (
     get_canvas_state,
     create_node,
@@ -11,6 +12,11 @@ from sand_martin.server import (
     disconnect_nodes,
     HOST_URL
 )
+
+@pytest.fixture(autouse=True)
+def mock_auth_token(monkeypatch):
+    """Set the SAND_MARTIN_TOKEN environment variable for all tests."""
+    monkeypatch.setenv("SAND_MARTIN_TOKEN", "test-token-123456789012345678901234")
 
 @pytest.mark.asyncio
 @respx.mock

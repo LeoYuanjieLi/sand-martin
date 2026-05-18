@@ -34,8 +34,16 @@ You can install the Sand Martin bridge directly from [PyPI](https://pypi.org/pro
 pip install sand-martin
 ```
 
-### 3. Build & Install the Host Plugin
-From the root directory:
+### 3. Install the Rhino/Grasshopper Plugin
+
+#### Option A: Download from Food4Rhino (Recommended)
+1.  Download the latest release from [Food4Rhino](https://www.food4rhino.com/en/app/sandmartin?lang=en).
+2.  In Grasshopper, go to **File > Special Folders > Components Folder**.
+3.  Place the downloaded `.gha` file (and any accompanying `.dll` files) into that folder.
+4.  Restart Rhino.
+
+#### Option B: Build from Source
+From the root directory, open `sand-martin.sln` in your IDE (Visual Studio or Rider) and build the `SandMartin.Host` project. Copy the resulting `.gha` file to your Grasshopper components folder.
 
 ## Configuration for Claude Desktop
 
