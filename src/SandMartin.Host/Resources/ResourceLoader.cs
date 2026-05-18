@@ -21,7 +21,11 @@ namespace SandMartin.Host.Resources
                         {
                             if (stream != null)
                             {
-                                _icon = new Bitmap(stream);
+                                using (var temp = new Bitmap(stream))
+                                {
+                                    // Grasshopper icons should be 24x24
+                                    _icon = new Bitmap(temp, new Size(24, 24));
+                                }
                             }
                         }
                     }
