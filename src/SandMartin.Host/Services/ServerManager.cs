@@ -9,6 +9,8 @@ namespace SandMartin.Host.Services
         private static ServerManager _instance;
         public static ServerManager Instance => _instance ??= new ServerManager();
 
+        public event EventHandler ServerStateChanged;
+
         private HttpListenerServer _server;
         private bool _isRunning = false;
         private string _authToken;
@@ -45,6 +47,8 @@ namespace SandMartin.Host.Services
             Rhino.RhinoApp.WriteLine("SAND MARTIN SERVER STARTED (STICKY)");
             Rhino.RhinoApp.WriteLine($"TOKEN: {_authToken}");
             Rhino.RhinoApp.WriteLine("--------------------------------------------------");
+
+            ServerStateChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void Stop()
@@ -57,6 +61,8 @@ namespace SandMartin.Host.Services
             DeleteTokenFile();
             
             Rhino.RhinoApp.WriteLine("Sand Martin Server stopped.");
+
+            ServerStateChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void UpdateSecuritySettings(bool allowCodeInjection)
