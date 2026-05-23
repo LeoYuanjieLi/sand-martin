@@ -67,6 +67,27 @@ namespace SandMartin.Host.Components
             }
         }
 
+        public override void AddedToDocument(GH_Document document)
+        {
+            base.AddedToDocument(document);
+            ServerManager.Instance.ServerStateChanged += OnServerStateChanged;
+        }
+
+        public override void RemovedFromDocument(GH_Document document)
+        {
+            ServerManager.Instance.ServerStateChanged -= OnServerStateChanged;
+            base.RemovedFromDocument(document);
+        }
+
+        private void OnServerStateChanged(object sender, EventArgs e)
+        {
+            // Trigger a re-compute to update the UI and output message
+            // We use the UI thread to ensure it's safe
+            Rhino.RhinoApp.InvokeOnUiThread(new Action(() => {
+                this.ExpireSolution(true);
+            }));
+        }
+
         protected override System.Drawing.Bitmap Icon => SandMartin.Host.Resources.ResourceLoader.SandMartinIcon;
 
         public override Guid ComponentGuid => new Guid("B531B51A-932F-4DA3-8CC8-8BC9C8F9FEE6");
