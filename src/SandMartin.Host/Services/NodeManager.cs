@@ -175,44 +175,24 @@ namespace SandMartin.Host.Services
 
                     if (request.Parameters != null)
                     {
-                        foreach (var kvp in request.Parameters)
+                        if (obj is IGH_Component component)
                         {
-                            bool set = false;
-                            
-                            // 1. Try Code Injection
-                            if (kvp.Key.Equals("Code", StringComparison.OrdinalIgnoreCase))
+                            foreach (var kvp in request.Parameters)
                             {
-                                if (ScriptInjector.SetComponentCode(obj, kvp.Value.ToString())) set = true;
-                            }
-                            
-                            // 2. Try reflection (for properties like Text on Scribbles, or Value on Sliders)
-                            if (!set)
-                            {
-                                var prop = obj.GetType().GetProperty(kvp.Key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                                if (prop != null && prop.CanWrite)
+                                if (kvp.Key.Equals("Code", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    try {
-                                        var targetType = prop.PropertyType;
-                                        object convertedValue = (targetType == typeof(decimal)) 
-                                            ? Convert.ToDecimal(kvp.Value) 
-                                            : Convert.ChangeType(kvp.Value, targetType);
-                                        
-                                        prop.SetValue(obj, convertedValue);
-                                        set = true;
-                                    } catch { }
+                                    ScriptInjector.SetComponentCode(obj, kvp.Value.ToString());
                                 }
-                            }
-
-                            // 3. Try IGH_Component Inputs
-                            if (!set && obj is IGH_Component component)
-                            {
-                                var inputParam = component.Params.Input.Find(p => p.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase) || 
-                                                                                p.NickName.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
-                                
-                                if (inputParam != null)
+                                else
                                 {
-                                    inputParam.VolatileData.Clear();
-                                    inputParam.AddVolatileData(new Grasshopper.Kernel.Data.GH_Path(0), 0, kvp.Value.ToString());
+                                    var inputParam = component.Params.Input.Find(p => p.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase) || 
+                                                                                    p.NickName.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
+                                    
+                                    if (inputParam != null)
+                                    {
+                                        inputParam.VolatileData.Clear();
+                                        inputParam.AddVolatileData(new Grasshopper.Kernel.Data.GH_Path(0), 0, kvp.Value.ToString());
+                                    }
                                 }
                             }
                         }
