@@ -6,8 +6,7 @@ namespace SandMartin.Host.Components
 {
     public class SandMartinServerComponent : GH_Component
     {
-        private static HttpListenerServer _server;
-        private bool _isRunning = false;
+        private bool _lastRunState = false;
 
         public SandMartinServerComponent()
           : base("Sand Martin Server", "SandMartin",
@@ -34,100 +33,38 @@ namespace SandMartin.Host.Components
             if (!DA.GetData(0, ref run)) return;
             DA.GetData(1, ref allowCode);
 
-            if (run && !_isRunning)
-            {
-                // Generate a random 32-character token for security
-                string token = GenerateAuthToken();
-                Rhino.RhinoApp.WriteLine("--------------------------------------------------");
-                Rhino.RhinoApp.WriteLine("SAND MARTIN SECURITY TOKEN GENERATED");
-                Rhino.RhinoApp.WriteLine($"TOKEN: {token}");
-                Rhino.RhinoApp.WriteLine("Set the SAND_MARTIN_TOKEN environment variable to this value.");
-                Rhino.RhinoApp.WriteLine("--------------------------------------------------");
+            var manager = ServerManager.Instance;
 
-                if (_server == null)
-                {
-                    var manager = new CanvasManager();
-                    var dispatcher = new RequestDispatcher(manager, token, allowCode);
-                    _server = new HttpListenerServer(dispatcher);
-                }
-                else
-                {
-                    // Update flags if server already exists
-                    _server.UpdateSecuritySettings(token, allowCode);
-                }
-                
-                _server.Start();
-                _isRunning = true;
-                WriteTokenToFile(token);
-                Message = "Running";
-            }
-            else if (run && _isRunning)
+            // Only trigger actions on state transitions to avoid accidental stops from new components
+            if (run && !_lastRunState)
             {
-                // Update code injection flag if changed while running
-                _server?.UpdateSecuritySettings(null, allowCode);
-                Message = "Running";
+                // Transition: False -> True
+                manager.Start(allowCode);
             }
-            else if (!run && _isRunning)
+            else if (!run && _lastRunState)
             {
-                _server?.Stop();
-                _isRunning = false;
-                DeleteTokenFile();
-                Message = "Stopped";
+                // Transition: True -> False
+                manager.Stop();
             }
-            else if (!run && !_isRunning)
+            else if (run && manager.IsRunning)
+            {
+                // Keep-alive/Update: Update settings if already running and input is True
+                manager.UpdateSecuritySettings(allowCode);
+            }
+
+            _lastRunState = run;
+
+            // Always synchronize UI and output with the actual global singleton state
+            if (manager.IsRunning)
+            {
+                Message = "Running";
+                DA.SetData(0, $"Server is running on port 8081. Code injection: {manager.AllowCodeInjection}");
+            }
+            else
             {
                 Message = "Stopped";
+                DA.SetData(0, "Server is stopped");
             }
-            
-            DA.SetData(0, _isRunning ? $"Server is running on port 8081. Code injection: {allowCode}" : "Server is stopped");
-        }
-
-        private string GetTokenFilePath()
-        {
-            return System.IO.Path.Combine(System.IO.Path.GetTempPath(), "sand_martin.token");
-        }
-
-        private void WriteTokenToFile(string token)
-        {
-            try {
-                System.IO.File.WriteAllText(GetTokenFilePath(), token);
-            } catch (Exception) {
-                // Ignore errors
-            }
-        }
-
-        private void DeleteTokenFile()
-        {
-            try {
-                string path = GetTokenFilePath();
-                if (System.IO.File.Exists(path)) {
-                    System.IO.File.Delete(path);
-                }
-            } catch (Exception) {
-                // Ignore errors
-            }
-        }
-
-        private string GenerateAuthToken()
-        {
-            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-            var random = new Random();
-            var result = new char[32];
-            for (int i = 0; i < result.Length; i++)
-            {
-                result[i] = chars[random.Next(chars.Length)];
-            }
-            return new string(result);
-        }
-
-        public override void RemovedFromDocument(GH_Document document)
-        {
-            if (_isRunning)
-            {
-                _server?.Stop();
-                _isRunning = false;
-            }
-            base.RemovedFromDocument(document);
         }
 
         protected override System.Drawing.Bitmap Icon => SandMartin.Host.Resources.ResourceLoader.SandMartinIcon;
