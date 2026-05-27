@@ -67,9 +67,9 @@ namespace SandMartin.Host.Services
                                 // Only include simple types to avoid serialization issues
                                 if (type.IsPrimitive || type == typeof(string) || type == typeof(decimal) || type.IsEnum)
                                 {
-                                    nodeInfo.Parameters[prop.Name] = new PropertyDetail { 
-                                        Value = prop.GetValue(obj), 
-                                        IsReadOnly = !prop.CanWrite 
+                                    nodeInfo.Parameters[prop.Name] = new PropertyDetail {
+                                        Value = prop.GetValue(obj),
+                                        IsReadOnly = !prop.CanWrite
                                     };
                                 }
                             }
@@ -95,7 +95,7 @@ namespace SandMartin.Host.Services
                             {
                                 paramInfo.Connections.Add(new ConnectionInfo {
                                     TargetId = source.Attributes.GetTopLevel.DocObject.InstanceGuid.ToString(),
-                                    TargetIndex = 0 
+                                    TargetIndex = 0
                                 });
                             }
                             nodeInfo.Inputs.Add(paramInfo);
@@ -145,7 +145,7 @@ namespace SandMartin.Host.Services
                     IGH_ObjectProxy proxy = null;
                     foreach (var p in Grasshopper.Instances.ComponentServer.ObjectProxies)
                     {
-                        if (p.Desc.Name.Equals(request.Type, StringComparison.OrdinalIgnoreCase) || 
+                        if (p.Desc.Name.Equals(request.Type, StringComparison.OrdinalIgnoreCase) ||
                             p.Type.Name.Equals(request.Type, StringComparison.OrdinalIgnoreCase))
                         {
                             proxy = p;
@@ -171,33 +171,69 @@ namespace SandMartin.Host.Services
                         obj.NickName = request.Name;
                     }
 
-                    doc.AddObject(obj, false);
-
                     if (request.Parameters != null)
                     {
-                        if (obj is IGH_Component component)
+                        foreach (var kvp in request.Parameters)
                         {
-                            foreach (var kvp in request.Parameters)
+                            bool set = false;
+
+                            // 1. Try Code Injection
+                            if (kvp.Key.Equals("Code", StringComparison.OrdinalIgnoreCase))
                             {
-                                if (kvp.Key.Equals("Code", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    ScriptInjector.SetComponentCode(obj, kvp.Value.ToString());
-                                }
-                                else
-                                {
-                                    var inputParam = component.Params.Input.Find(p => p.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase) || 
-                                                                                    p.NickName.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
-                                    
-                                    if (inputParam != null)
+                                if (ScriptInjector.SetComponentCode(obj, kvp.Value.ToString())) set = true;
+                            }
+
+                            // 2. Try reflection (for properties like Text on Scribbles, or Value on Sliders)
+                            if (!set)
+                            {
+                                try {
+                                    // Search Properties including base classes
+                                    var prop = obj.GetType().GetProperty(kvp.Key, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase | BindingFlags.FlattenHierarchy);
+                                    if (prop != null && prop.CanWrite)
                                     {
-                                        inputParam.VolatileData.Clear();
-                                        inputParam.AddVolatileData(new Grasshopper.Kernel.Data.GH_Path(0), 0, kvp.Value.ToString());
+                                        var targetType = prop.PropertyType;
+                                        object convertedValue = (targetType == typeof(string)) ? kvp.Value.ToString() :
+                                                               (targetType == typeof(decimal)) ? Convert.ToDecimal(kvp.Value) :
+                                                               Convert.ChangeType(kvp.Value, targetType);
+                                        prop.SetValue(obj, convertedValue);
+                                        set = true;
                                     }
+
+                                    // Search Fields (if property not found)
+                                    if (!set)
+                                    {
+                                        var field = obj.GetType().GetField(kvp.Key, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase | BindingFlags.FlattenHierarchy) ??
+                                                    obj.GetType().GetField("m_" + kvp.Key, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase);
+
+                                        if (field != null)
+                                        {
+                                            var targetType = field.FieldType;
+                                            object convertedValue = (targetType == typeof(string)) ? kvp.Value.ToString() :
+                                                                   (targetType == typeof(decimal)) ? Convert.ToDecimal(kvp.Value) :
+                                                                   Convert.ChangeType(kvp.Value, targetType);
+                                            field.SetValue(obj, convertedValue);
+                                            set = true;
+                                        }
+                                    }
+                                } catch { }
+                            }
+
+                            // 3. Try IGH_Component Inputs
+                            if (!set && obj is IGH_Component component)
+                            {
+                                var inputParam = component.Params.Input.Find(p => p.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase) ||
+                                                                                p.NickName.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
+
+                                if (inputParam != null)
+                                {
+                                    inputParam.VolatileData.Clear();
+                                    inputParam.AddVolatileData(new Grasshopper.Kernel.Data.GH_Path(0), 0, kvp.Value.ToString());
                                 }
                             }
                         }
                     }
 
+                    doc.AddObject(obj, false);
                     obj.ExpireSolution(true);
                     tcs.SetResult(JsonConvert.SerializeObject(new { status = "success", id = obj.InstanceGuid.ToString() }));
 
@@ -282,25 +318,21 @@ namespace SandMartin.Host.Services
                                 {
                                     bool propertySet = false;
 
-                                    // 1. Try generic reflection for public properties (e.g., CurrentValue, Value, UserText)
-                                    var prop = obj.GetType().GetProperty(kvp.Key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                                    // 1. Try generic reflection for properties (e.g., CurrentValue, Value, Text)
+                                    var prop = obj.GetType().GetProperty(kvp.Key, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase | BindingFlags.FlattenHierarchy);
                                     if (prop != null)
                                     {
                                         if (prop.CanWrite)
                                         {
                                             try {
                                                 var targetType = prop.PropertyType;
-                                                object convertedValue;
-                                                if (targetType == typeof(decimal)) {
-                                                    convertedValue = Convert.ToDecimal(kvp.Value);
-                                                } else {
-                                                    convertedValue = Convert.ChangeType(kvp.Value, targetType);
-                                                }
-                                                
+                                                object convertedValue = (targetType == typeof(string)) ? kvp.Value.ToString() :
+                                                                       (targetType == typeof(decimal)) ? Convert.ToDecimal(kvp.Value) :
+                                                                       Convert.ChangeType(kvp.Value, targetType);
+
                                                 prop.SetValue(obj, convertedValue);
                                                 propertySet = true;
                                                 modified = true;
-                                                Rhino.RhinoApp.WriteLine($"[SandMartin] Set property {prop.Name} on {obj.GetType().Name}");
                                             } catch (Exception ex) {
                                                 errors.Add($"Failed to set property '{kvp.Key}': {ex.Message}");
                                             }
@@ -311,7 +343,29 @@ namespace SandMartin.Host.Services
                                         }
                                     }
 
-                                    // 2. Fallback to IGH_Component inputs
+                                    // 2. Try Fields
+                                    if (!propertySet)
+                                    {
+                                        var field = obj.GetType().GetField(kvp.Key, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase | BindingFlags.FlattenHierarchy) ??
+                                                    obj.GetType().GetField("m_" + kvp.Key, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase);
+
+                                        if (field != null)
+                                        {
+                                            try {
+                                                var targetType = field.FieldType;
+                                                object convertedValue = (targetType == typeof(string)) ? kvp.Value.ToString() :
+                                                                       (targetType == typeof(decimal)) ? Convert.ToDecimal(kvp.Value) :
+                                                                       Convert.ChangeType(kvp.Value, targetType);
+                                                field.SetValue(obj, convertedValue);
+                                                propertySet = true;
+                                                modified = true;
+                                            } catch (Exception ex) {
+                                                errors.Add($"Failed to set field '{kvp.Key}': {ex.Message}");
+                                            }
+                                        }
+                                    }
+
+                                    // 3. Fallback to IGH_Component inputs
                                     if (!propertySet && obj is IGH_Component component)
                                     {
                                         var inputParam = component.Params.Input.Find(p => p.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase) ||

@@ -26,7 +26,7 @@ namespace SandMartin.Host.Services
         private Task<string> GetRhinoCanvasState()
         {
             var tcs = new TaskCompletionSource<string>();
-            
+
             Rhino.RhinoApp.InvokeOnUiThread(new Action(() => {
                 try {
                     var doc = Grasshopper.Instances.ActiveCanvas?.Document;
@@ -44,8 +44,31 @@ namespace SandMartin.Host.Services
                             Nickname = obj.NickName,
                             Type = obj.GetType().Name,
                             X = obj.Attributes.Pivot.X,
-                            Y = obj.Attributes.Pivot.Y
+                            Y = obj.Attributes.Pivot.Y,
+                            Width = obj.Attributes.Bounds.Width,
+                            Height = obj.Attributes.Bounds.Height
                         };
+
+                        // Extract properties via reflection
+                        var props = obj.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.FlattenHierarchy);
+                        foreach (var prop in props)
+                        {
+                            try {
+                                if (prop.CanRead)
+                                {
+                                    var type = prop.PropertyType;
+                                    if (type.IsPrimitive || type == typeof(string) || type == typeof(decimal) || type.IsEnum)
+                                    {
+                                        node.Parameters[prop.Name] = new PropertyDetail {
+                                            Value = prop.GetValue(obj),
+                                            IsReadOnly = !prop.CanWrite
+                                        };
+                                    }
+                                }
+                            } catch (Exception ex) {
+                                Log($"Failed to read property '{prop.Name}' on {obj.GetType().Name} ({obj.InstanceGuid}): {ex.Message}");
+                            }
+                        }
 
                         if (obj is IGH_Component component)
                         {
@@ -57,7 +80,7 @@ namespace SandMartin.Host.Services
                                 {
                                     paramInfo.Connections.Add(new ConnectionInfo {
                                         TargetId = source.Attributes.GetTopLevel.DocObject.InstanceGuid.ToString(),
-                                        TargetIndex = 0 
+                                        TargetIndex = 0
                                     });
                                 }
                                 node.Inputs.Add(paramInfo);
@@ -69,7 +92,7 @@ namespace SandMartin.Host.Services
                                 node.Outputs.Add(new Models.ParameterInfo { Name = p.Name, Nickname = p.NickName, Index = i });
                             }
                         }
-                        
+
                         nodes.Add(node);
                     }
 
@@ -80,6 +103,18 @@ namespace SandMartin.Host.Services
             }));
 
             return tcs.Task;
+        }
+
+        private static void Log(string message)
+        {
+            try
+            {
+                Rhino.RhinoApp.WriteLine($"[SandMartin] {message}");
+            }
+            catch
+            {
+                Console.WriteLine($"[SandMartin] {message}");
+            }
         }
     }
 }
