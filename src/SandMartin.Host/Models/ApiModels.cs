@@ -89,6 +89,12 @@ namespace SandMartin.Host.Models
         [JsonProperty("y")]
         public float Y { get; set; }
 
+        [JsonProperty("width")]
+        public float Width { get; set; }
+
+        [JsonProperty("height")]
+        public float Height { get; set; }
+
         [JsonProperty("parameters")]
         public Dictionary<string, object> Parameters { get; set; } = new Dictionary<string, object>();
 

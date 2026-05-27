@@ -10,6 +10,7 @@ from sand_martin.server import (
     delete_node,
     connect_nodes,
     disconnect_nodes,
+    add_description,
     HOST_URL
 )
 
@@ -44,7 +45,7 @@ async def test_create_node():
     # Assert
     assert json.loads(result)["status"] == "success"
     assert json.loads(result)["id"] == "guid-123"
-    
+
     request = respx.calls.last.request
     request_data = json.loads(request.content)
     assert request_data["type"] == "Circle"
@@ -62,7 +63,7 @@ async def test_update_node():
 
     # Assert
     assert json.loads(result)["status"] == "success"
-    
+
     request = respx.calls.last.request
     request_data = json.loads(request.content)
     assert request_data["name"] == "New Name"
@@ -94,7 +95,7 @@ async def test_connect_nodes():
 
     # Assert
     assert json.loads(result)["status"] == "success"
-    
+
     request = respx.calls.last.request
     request_data = json.loads(request.content)
     assert request_data["source_id"] == "src-1"
@@ -113,7 +114,7 @@ async def test_disconnect_nodes():
 
     # Assert
     assert json.loads(result)["status"] == "success"
-    
+
     request = respx.calls.last.request
     request_data = json.loads(request.content)
     assert request_data["source_id"] == "src-1"
@@ -132,3 +133,38 @@ async def test_make_request_error_handling():
     response = json.loads(result)
     assert response["status"] == "error"
     assert "HTTP error" in response["message"]
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_add_description_semantic():
+    # Arrange: Mock a small graph
+    canvas_state = {
+        "nodes": [
+            {"id": "1", "name": "Input1", "inputs": [], "outputs": [], "x": 0, "y": 0},
+            {"id": "2", "name": "Input2", "inputs": [], "outputs": [], "x": 0, "y": 0}
+        ]
+    }
+    semantic_clusters = json.dumps([{"name": "Inputs", "node_ids": ["1", "2"]}])
+
+    respx.get(f"{HOST_URL}/state").mock(return_value=httpx.Response(200, json=canvas_state))
+    respx.patch(f"{HOST_URL}/update/1").mock(return_value=httpx.Response(200, json={"status": "success"}))
+    respx.patch(f"{HOST_URL}/update/2").mock(return_value=httpx.Response(200, json={"status": "success"}))
+    respx.post(f"{HOST_URL}/create").mock(return_value=httpx.Response(200, json={"status": "success"}))
+
+    # Act
+    result_json = await add_description(semantic_clusters=semantic_clusters)
+    result = json.loads(result_json)
+
+    # Assert
+    assert result["status"] == "success"
+    assert "master annotation" in result["message"]
+
+    # Verify group creation was called
+    create_calls = [c for c in respx.calls if c.request.url == f"{HOST_URL}/create"]
+    assert len(create_calls) >= 1
+
+    group_req = json.loads(create_calls[0].request.content)
+    assert group_req["type"] == "Scribble"
+    assert group_req["canvasX"] == 0
+    assert group_req["canvasY"] == -160
+    assert group_req["parameters"]["Text"] == "SCRIPT DOCUMENTATION:\n• Inputs"
