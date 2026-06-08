@@ -74,7 +74,7 @@ namespace SandMartin.Host.Services
                         {
                             case "/create":
                                 var createReq = JsonConvert.DeserializeObject<CreateNodeRequest>(body);
-                                if (!_allowCodeInjection && createReq.Parameters != null && createReq.Parameters.ContainsKey("Code"))
+                                if (!_allowCodeInjection && createReq?.Parameters != null && createReq.Parameters.ContainsKey("Code"))
                                 {
                                     response.StatusCode = (int)HttpStatusCode.Forbidden;
                                     responseBody = JsonConvert.SerializeObject(new { error = "Code injection is disabled on the Sand Martin Server component." });

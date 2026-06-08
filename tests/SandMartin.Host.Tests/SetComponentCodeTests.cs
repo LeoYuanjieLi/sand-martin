@@ -35,6 +35,32 @@ namespace SandMartin.Host.Tests
             public void ReBuild() => Rebuilt = true;
         }
 
+        public class Rhino8SdkComponentMock : GH_Component
+        {
+            public Rhino8SdkComponentMock() : base("Mock", "M", "Mock", "Test", "Test") { }
+            public override Guid ComponentGuid => Guid.NewGuid();
+            protected override void RegisterInputParams(GH_InputParamManager pManager) { }
+            protected override void RegisterOutputParams(GH_OutputParamManager pManager) { }
+            protected override void SolveInstance(IGH_DataAccess DA) { }
+
+            public Rhino8SdkContext Context = new Rhino8SdkContext();
+        }
+
+        public class Rhino8SdkContext
+        {
+            public Rhino8Script Script { get; } = new Rhino8Script();
+            public bool ContextSetterCalled { get; private set; }
+            public void SetText(string text) => ContextSetterCalled = true;
+        }
+
+        public class Rhino8Script
+        {
+            public string Text { get; private set; }
+            public bool Built { get; private set; }
+            public void SetText(string text) => Text = text;
+            public void TryBuild() => Built = true;
+        }
+
         public class LegacyComponentMock : GH_Component
         {
             public LegacyComponentMock() : base("Mock", "M", "Mock", "Test", "Test") { }
@@ -98,6 +124,20 @@ namespace SandMartin.Host.Tests
             Assert.Equal(testCode, component.Context.Text);
             Assert.True(component.Context.Rebuilt);
             Assert.True(component.WasSolutionExpired);
+        }
+
+        [Fact]
+        public void SetComponentCode_Rhino8SdkStyle_PreservesSdkScriptMode()
+        {
+            var component = new Rhino8SdkComponentMock();
+            const string testCode = "public class Script_Instance {}";
+
+            bool result = ScriptInjector.SetComponentCode(component, testCode);
+
+            Assert.True(result);
+            Assert.Equal(testCode, component.Context.Script.Text);
+            Assert.True(component.Context.Script.Built);
+            Assert.False(component.Context.ContextSetterCalled);
         }
 
         [Fact]
