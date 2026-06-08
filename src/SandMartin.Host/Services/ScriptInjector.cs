@@ -95,43 +95,44 @@ namespace SandMartin.Host.Services
             Log("Detected Rhino 8 Script context. Injecting code...");
             bool textSet = false;
 
-            // Step 1: Set the text
-            var ctxSetTextMethod = contextObj.GetType().GetMethod("SetText", new Type[] { typeof(string) });
-            if (ctxSetTextMethod != null)
+            // SDK-mode components store complete source on the Script object. Writing
+            // through Context.SetText first can switch them into legacy body-only mode.
+            var scriptProp = contextObj.GetType().GetProperty("Script");
+            var scriptObj = scriptProp?.GetValue(contextObj);
+            if (scriptObj != null)
             {
-                ctxSetTextMethod.Invoke(contextObj, new object[] { code });
-                textSet = true;
-                Log("Code set via Context.SetText()");
+                var scriptSetTextMethod = scriptObj.GetType().GetMethod("SetText", new Type[] { typeof(string) });
+                if (scriptSetTextMethod != null)
+                {
+                    scriptSetTextMethod.Invoke(scriptObj, new object[] { code });
+                    textSet = true;
+                    Log("Code set via Script.SetText()");
+                }
+                else
+                {
+                    var textProp = scriptObj.GetType().GetProperty("Text");
+                    if (textProp != null && textProp.CanWrite)
+                    {
+                        textProp.SetValue(scriptObj, code);
+                        textSet = true;
+                        Log("Code set via Script.Text property");
+                    }
+                }
+
+                if (textSet)
+                {
+                    InvokeOptionalMethod(scriptObj, "TryBuild");
+                }
             }
-            
+
             if (!textSet)
             {
-                var scriptProp = contextObj.GetType().GetProperty("Script");
-                var scriptObj = scriptProp?.GetValue(contextObj);
-                if (scriptObj != null)
+                var ctxSetTextMethod = contextObj.GetType().GetMethod("SetText", new Type[] { typeof(string) });
+                if (ctxSetTextMethod != null)
                 {
-                    var scriptSetTextMethod = scriptObj.GetType().GetMethod("SetText", new Type[] { typeof(string) });
-                    if (scriptSetTextMethod != null)
-                    {
-                        scriptSetTextMethod.Invoke(scriptObj, new object[] { code });
-                        textSet = true;
-                        Log("Code set via Script.SetText()");
-                    }
-                    else
-                    {
-                        var textProp = scriptObj.GetType().GetProperty("Text");
-                        if (textProp != null)
-                        {
-                            textProp.SetValue(scriptObj, code);
-                            textSet = true;
-                            Log("Code set via Script.Text property");
-                        }
-                    }
-
-                    if (textSet)
-                    {
-                        InvokeOptionalMethod(scriptObj, "TryBuild");
-                    }
+                    ctxSetTextMethod.Invoke(contextObj, new object[] { code });
+                    textSet = true;
+                    Log("Code set via Context.SetText()");
                 }
             }
 

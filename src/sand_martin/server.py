@@ -45,6 +45,11 @@ mcp = FastMCP(
     2. Call `get_node_details(node_id)` to see its current properties.
     3. Identify a writable property (where `"r": false`) such as 'TickValue'.
     4. Call `update_node(node_id, parameters={'TickValue': 500})` to make the change.
+
+    SCRIPTING:
+    Use `create_script_node()` for C# or Python 3 scripts. For C#, pass only the
+    RunScript method body. For Python, pass top-level statements and assign outputs
+    such as `a`. The tool discovers Rhino's source format and validates the component.
     """
 )
 
@@ -185,6 +190,158 @@ async def create_node(
         "parameters": parameters or {}
     }
     return await _make_request("POST", "/create", data)
+
+def _replace_csharp_run_script_body(source: str, script_body: str) -> str:
+    """Replace the body of Rhino's generated C# RunScript method."""
+    signature_start = source.find("void RunScript(")
+    if signature_start < 0:
+        raise ValueError("Rhino C# template does not contain a RunScript method")
+
+    body_start = source.find("{", signature_start)
+    if body_start < 0:
+        raise ValueError("Rhino C# template has an invalid RunScript method")
+
+    depth = 0
+    body_end = -1
+    for index in range(body_start, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                body_end = index
+                break
+
+    if body_end < 0:
+        raise ValueError("Rhino C# template has an unterminated RunScript method")
+
+    body_lines = script_body.strip().splitlines()
+    indented_body = "\n".join(
+        f"        {line}" if line else ""
+        for line in body_lines
+    )
+    return f"{source[:body_start + 1]}\n{indented_body}\n    {source[body_end:]}"
+
+def _replace_python_script_body(source: str, script_body: str) -> str:
+    """Return Rhino Python 3's top-level script body."""
+    del source
+    return script_body.strip() + "\n"
+
+async def _delete_failed_node(node_id: str) -> None:
+    try:
+        cleanup_result = json.loads(await _make_request("DELETE", f"/node/{node_id}"))
+        if cleanup_result.get("status") != "success":
+            logger.warning(f"Failed to clean up script node {node_id}: {cleanup_result}")
+    except Exception as e:
+        logger.warning(f"Failed to clean up script node {node_id}: {e}")
+
+@mcp.tool()
+async def create_script_node(
+    name: str,
+    canvas_x: int,
+    canvas_y: int,
+    script_body: str,
+    language: str = "csharp"
+) -> str:
+    """
+    Creates and validates a Rhino 8 C# or Python 3 scripting component.
+
+    The tool creates the component before injecting code and reads its actual inputs,
+    outputs, and source format. C# code replaces the generated RunScript body.
+    Python code is injected as Rhino's top-level script body.
+
+    Args:
+        name: The component nickname.
+        canvas_x: The X coordinate on the canvas.
+        canvas_y: The Y coordinate on the canvas.
+        script_body: C# statements for the RunScript method body. Do not include
+            a RunScript declaration, Script_Instance class, or using directives.
+            For Python, pass top-level statements and assign output variables such
+            as `a`; do not declare a RunScript function.
+        language: `csharp` (default) or `python`.
+    """
+    normalized_language = language.strip().lower()
+    language_config = {
+        "csharp": ("CSharpComponent", _replace_csharp_run_script_body),
+        "cs": ("CSharpComponent", _replace_csharp_run_script_body),
+        "python": ("Python3Component", _replace_python_script_body),
+        "python3": ("Python3Component", _replace_python_script_body)
+    }
+    if normalized_language not in language_config:
+        return json.dumps({
+            "status": "error",
+            "message": "Unsupported script language. Use 'csharp' or 'python'."
+        })
+
+    component_type, replace_body = language_config[normalized_language]
+    logger.info(
+        f"Tool called: create_script_node (name={name}, language={normalized_language})"
+    )
+
+    create_result = json.loads(await _make_request("POST", "/create", {
+        "type": component_type,
+        "name": name,
+        "canvasX": canvas_x,
+        "canvasY": canvas_y,
+        "parameters": {}
+    }))
+    if create_result.get("status") != "success" or not create_result.get("id"):
+        return json.dumps(create_result)
+
+    node_id = create_result["id"]
+    try:
+        details = json.loads(await _make_request("GET", f"/node/{node_id}"))
+        code_detail = details.get("parameters", {}).get("Code")
+        template = code_detail.get("v") if isinstance(code_detail, dict) else None
+        if not template:
+            await _delete_failed_node(node_id)
+            return json.dumps({
+                "status": "error",
+                "message": "Created script component did not expose editable code"
+            })
+
+        source = replace_body(template, script_body)
+        update_result = json.loads(await _make_request("PATCH", f"/update/{node_id}", {
+            "parameters": {"Code": source}
+        }))
+        if update_result.get("status") != "success":
+            await _delete_failed_node(node_id)
+            return json.dumps(update_result)
+
+        verified = json.loads(await _make_request("GET", f"/node/{node_id}"))
+        parameters = verified.get("parameters", {})
+        runtime_detail = parameters.get("RuntimeMessageLevel", {})
+        runtime_level = runtime_detail.get("v") if isinstance(runtime_detail, dict) else None
+        sdk_detail = parameters.get("IsSDKMode", {})
+        sdk_mode = sdk_detail.get("v") if isinstance(sdk_detail, dict) else None
+
+        validation_errors = []
+        if runtime_level != 0:
+            validation_errors.append(
+                parameters.get("InstanceDescription", {}).get(
+                    "v", "The script component reported a runtime or compilation error"
+                )
+            )
+        if component_type == "CSharpComponent" and sdk_mode is not True:
+            validation_errors.append(
+                "The C# component did not remain in Rhino 8 SDK mode"
+            )
+
+        result = {
+            "status": "error" if validation_errors else "success",
+            "id": node_id,
+            "runtime_message_level": runtime_level,
+            "is_sdk_mode": sdk_mode,
+            "inputs": verified.get("inputs", []),
+            "outputs": verified.get("outputs", [])
+        }
+        if validation_errors:
+            result["message"] = " ".join(validation_errors)
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"Failed to create script node: {e}")
+        await _delete_failed_node(node_id)
+        return json.dumps({"status": "error", "message": str(e)})
 
 @mcp.tool()
 async def update_node(

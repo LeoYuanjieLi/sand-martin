@@ -58,6 +58,30 @@ namespace SandMartin.Host.Tests
         }
 
         [Fact]
+        public async Task CreateNode_NullRequest_ReturnsValidationError()
+        {
+            var manager = new CanvasManager();
+
+            var jsonResult = await manager.CreateNode(null);
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+
+            Assert.Equal("error", response["status"]);
+            Assert.Equal("Create request body is required", response["message"]);
+        }
+
+        [Fact]
+        public async Task CreateNode_MissingType_ReturnsValidationError()
+        {
+            var manager = new CanvasManager();
+
+            var jsonResult = await manager.CreateNode(new CreateNodeRequest());
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+
+            Assert.Equal("error", response["status"]);
+            Assert.Equal("Component type is required", response["message"]);
+        }
+
+        [Fact]
         public async Task UpdateNode_NotRunningInRhino_ReturnsErrorJson()
         {
             // Arrange

@@ -119,6 +119,16 @@ namespace SandMartin.Host.Services
 
         public virtual Task<string> CreateNode(CreateNodeRequest request)
         {
+            if (request == null)
+            {
+                return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "Create request body is required" }));
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Type))
+            {
+                return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "Component type is required" }));
+            }
+
             try {
                 if (IsRunningInRhino())
                 {
@@ -145,8 +155,15 @@ namespace SandMartin.Host.Services
                     IGH_ObjectProxy proxy = null;
                     foreach (var p in Grasshopper.Instances.ComponentServer.ObjectProxies)
                     {
-                        if (p.Desc.Name.Equals(request.Type, StringComparison.OrdinalIgnoreCase) ||
-                            p.Type.Name.Equals(request.Type, StringComparison.OrdinalIgnoreCase))
+                        if (p == null)
+                        {
+                            continue;
+                        }
+
+                        var proxyName = p.Desc?.Name;
+                        var proxyTypeName = p.Type?.Name;
+                        if (string.Equals(proxyName, request.Type, StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(proxyTypeName, request.Type, StringComparison.OrdinalIgnoreCase))
                         {
                             proxy = p;
                             break;
@@ -165,17 +182,33 @@ namespace SandMartin.Host.Services
                     }
 
                     obj.CreateAttributes();
+                    if (obj.Attributes == null) {
+                        tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = $"Component type '{request.Type}' did not create canvas attributes" }));
+                        return;
+                    }
+
                     obj.Attributes.Pivot = new System.Drawing.PointF(request.CanvasX, request.CanvasY);
 
                     if (!string.IsNullOrEmpty(request.Name)) {
                         obj.NickName = request.Name;
                     }
 
+                    // Rhino 8 initializes SDK script state only after the component is
+                    // attached to a document. Parameters such as Code must be applied
+                    // after this point or the script context falls back to legacy mode.
+                    doc.AddObject(obj, false);
+
                     if (request.Parameters != null)
                     {
                         foreach (var kvp in request.Parameters)
                         {
                             bool set = false;
+                            if (kvp.Value == null)
+                            {
+                                doc.RemoveObject(obj, true);
+                                tcs.SetResult(JsonConvert.SerializeObject(new { status = "error", message = $"Parameter '{kvp.Key}' cannot be null" }));
+                                return;
+                            }
 
                             // 1. Try Code Injection
                             if (kvp.Key.Equals("Code", StringComparison.OrdinalIgnoreCase))
@@ -233,7 +266,6 @@ namespace SandMartin.Host.Services
                         }
                     }
 
-                    doc.AddObject(obj, false);
                     obj.ExpireSolution(true);
                     tcs.SetResult(JsonConvert.SerializeObject(new { status = "success", id = obj.InstanceGuid.ToString() }));
 

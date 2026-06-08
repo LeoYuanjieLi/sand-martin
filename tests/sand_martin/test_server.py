@@ -6,6 +6,7 @@ import os
 from sand_martin.server import (
     get_canvas_state,
     create_node,
+    create_script_node,
     update_node,
     delete_node,
     connect_nodes,
@@ -50,6 +51,142 @@ async def test_create_node():
     request_data = json.loads(request.content)
     assert request_data["type"] == "Circle"
     assert request_data["canvasX"] == 100
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_create_script_node_uses_rhino_template_and_validates():
+    node_id = "script-guid"
+    template = """public class Script_Instance : GH_ScriptInstance
+{
+    private void RunScript(object inputValue, ref object result)
+    {
+        result = null;
+    }
+}
+"""
+    initial_details = {
+        "id": node_id,
+        "parameters": {"Code": {"v": template, "r": False}},
+        "inputs": [{"name": "inputValue", "index": 0}],
+        "outputs": [{"name": "result", "index": 0}]
+    }
+    verified_details = {
+        **initial_details,
+        "parameters": {
+            "Code": {"v": template, "r": False},
+            "RuntimeMessageLevel": {"v": 0, "r": True},
+            "IsSDKMode": {"v": True, "r": True}
+        }
+    }
+
+    respx.post(f"{HOST_URL}/create").mock(
+        return_value=httpx.Response(200, json={"status": "success", "id": node_id})
+    )
+    respx.get(f"{HOST_URL}/node/{node_id}").mock(
+        side_effect=[
+            httpx.Response(200, json=initial_details),
+            httpx.Response(200, json=verified_details)
+        ]
+    )
+    respx.patch(f"{HOST_URL}/update/{node_id}").mock(
+        return_value=httpx.Response(200, json={"status": "success", "id": node_id})
+    )
+
+    result = json.loads(await create_script_node(
+        name="Generated Script",
+        canvas_x=300,
+        canvas_y=400,
+        script_body="result = inputValue;"
+    ))
+
+    assert result["status"] == "success"
+    assert result["id"] == node_id
+    assert result["runtime_message_level"] == 0
+    assert result["is_sdk_mode"] is True
+
+    create_request = json.loads(respx.calls[0].request.content)
+    assert create_request["type"] == "CSharpComponent"
+    assert create_request["parameters"] == {}
+
+    update_request = json.loads(respx.calls[2].request.content)
+    injected_code = update_request["parameters"]["Code"]
+    assert "private void RunScript(object inputValue, ref object result)" in injected_code
+    assert "        result = inputValue;" in injected_code
+    assert "result = null;" not in injected_code
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_create_script_node_cleans_up_when_template_is_missing():
+    node_id = "script-guid"
+    respx.post(f"{HOST_URL}/create").mock(
+        return_value=httpx.Response(200, json={"status": "success", "id": node_id})
+    )
+    respx.get(f"{HOST_URL}/node/{node_id}").mock(
+        return_value=httpx.Response(200, json={"id": node_id, "parameters": {}})
+    )
+    delete_route = respx.delete(f"{HOST_URL}/node/{node_id}").mock(
+        return_value=httpx.Response(200, json={"status": "success", "id": node_id})
+    )
+
+    result = json.loads(await create_script_node(
+        name="Broken Script",
+        canvas_x=0,
+        canvas_y=0,
+        script_body="a = x;"
+    ))
+
+    assert result["status"] == "error"
+    assert "editable code" in result["message"]
+    assert delete_route.called
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_create_script_node_supports_python_template():
+    node_id = "python-script-guid"
+    template = '"""Grasshopper Script"""\na = "Hello Python 3 in Grasshopper!"\nprint(a)\n'
+    initial_details = {
+        "id": node_id,
+        "parameters": {"Code": {"v": template, "r": False}},
+        "inputs": [{"name": "x", "index": 0}, {"name": "y", "index": 1}],
+        "outputs": [{"name": "a", "index": 0}]
+    }
+    verified_details = {
+        **initial_details,
+        "parameters": {
+            "Code": {"v": template, "r": False},
+            "RuntimeMessageLevel": {"v": 0, "r": True},
+            "IsSDKMode": {"v": False, "r": True}
+        }
+    }
+
+    respx.post(f"{HOST_URL}/create").mock(
+        return_value=httpx.Response(200, json={"status": "success", "id": node_id})
+    )
+    respx.get(f"{HOST_URL}/node/{node_id}").mock(
+        side_effect=[
+            httpx.Response(200, json=initial_details),
+            httpx.Response(200, json=verified_details)
+        ]
+    )
+    respx.patch(f"{HOST_URL}/update/{node_id}").mock(
+        return_value=httpx.Response(200, json={"status": "success", "id": node_id})
+    )
+
+    result = json.loads(await create_script_node(
+        name="Generated Python",
+        canvas_x=300,
+        canvas_y=400,
+        script_body="a = f'{x}: {y}'",
+        language="python"
+    ))
+
+    assert result["status"] == "success"
+    create_request = json.loads(respx.calls[0].request.content)
+    assert create_request["type"] == "Python3Component"
+
+    update_request = json.loads(respx.calls[2].request.content)
+    injected_code = update_request["parameters"]["Code"]
+    assert injected_code == "a = f'{x}: {y}'\n"
 
 @pytest.mark.asyncio
 @respx.mock
