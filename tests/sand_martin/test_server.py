@@ -55,6 +55,7 @@ async def test_create_node():
 @pytest.mark.asyncio
 @respx.mock
 async def test_create_script_node_uses_rhino_template_and_validates():
+    template_node_id = "template-guid"
     node_id = "script-guid"
     template = """public class Script_Instance : GH_ScriptInstance
 {
@@ -65,31 +66,40 @@ async def test_create_script_node_uses_rhino_template_and_validates():
 }
 """
     initial_details = {
-        "id": node_id,
+        "id": template_node_id,
         "parameters": {"Code": {"v": template, "r": False}},
         "inputs": [{"name": "inputValue", "index": 0}],
         "outputs": [{"name": "result", "index": 0}]
     }
+    expected_source = template.replace(
+        "        result = null;",
+        "        result = inputValue;"
+    )
     verified_details = {
-        **initial_details,
+        "id": node_id,
         "parameters": {
-            "Code": {"v": template, "r": False},
+            "Code": {"v": expected_source, "r": False},
             "RuntimeMessageLevel": {"v": 0, "r": True},
             "IsSDKMode": {"v": True, "r": True}
-        }
+        },
+        "inputs": [{"name": "inputValue", "index": 0}],
+        "outputs": [{"name": "result", "index": 0}]
     }
 
     respx.post(f"{HOST_URL}/create").mock(
-        return_value=httpx.Response(200, json={"status": "success", "id": node_id})
-    )
-    respx.get(f"{HOST_URL}/node/{node_id}").mock(
         side_effect=[
-            httpx.Response(200, json=initial_details),
-            httpx.Response(200, json=verified_details)
+            httpx.Response(200, json={"status": "success", "id": template_node_id}),
+            httpx.Response(200, json={"status": "success", "id": node_id})
         ]
     )
-    respx.patch(f"{HOST_URL}/update/{node_id}").mock(
-        return_value=httpx.Response(200, json={"status": "success", "id": node_id})
+    respx.get(f"{HOST_URL}/node/{template_node_id}").mock(
+        return_value=httpx.Response(200, json=initial_details)
+    )
+    respx.delete(f"{HOST_URL}/node/{template_node_id}").mock(
+        return_value=httpx.Response(200, json={"status": "success", "id": template_node_id})
+    )
+    respx.get(f"{HOST_URL}/node/{node_id}").mock(
+        return_value=httpx.Response(200, json=verified_details)
     )
 
     result = json.loads(await create_script_node(
@@ -108,8 +118,8 @@ async def test_create_script_node_uses_rhino_template_and_validates():
     assert create_request["type"] == "CSharpComponent"
     assert create_request["parameters"] == {}
 
-    update_request = json.loads(respx.calls[2].request.content)
-    injected_code = update_request["parameters"]["Code"]
+    final_create_request = json.loads(respx.calls[3].request.content)
+    injected_code = final_create_request["parameters"]["Code"]
     assert "private void RunScript(object inputValue, ref object result)" in injected_code
     assert "        result = inputValue;" in injected_code
     assert "result = null;" not in injected_code
@@ -117,7 +127,7 @@ async def test_create_script_node_uses_rhino_template_and_validates():
 @pytest.mark.asyncio
 @respx.mock
 async def test_create_script_node_cleans_up_when_template_is_missing():
-    node_id = "script-guid"
+    node_id = "template-guid"
     respx.post(f"{HOST_URL}/create").mock(
         return_value=httpx.Response(200, json={"status": "success", "id": node_id})
     )
@@ -142,34 +152,44 @@ async def test_create_script_node_cleans_up_when_template_is_missing():
 @pytest.mark.asyncio
 @respx.mock
 async def test_create_script_node_supports_python_template():
+    template_node_id = "python-template-guid"
     node_id = "python-script-guid"
     template = '"""Grasshopper Script"""\na = "Hello Python 3 in Grasshopper!"\nprint(a)\n'
     initial_details = {
-        "id": node_id,
+        "id": template_node_id,
         "parameters": {"Code": {"v": template, "r": False}},
         "inputs": [{"name": "x", "index": 0}, {"name": "y", "index": 1}],
         "outputs": [{"name": "a", "index": 0}]
     }
+    expected_source = "a = f'{x}: {y}'\n"
     verified_details = {
-        **initial_details,
+        "id": node_id,
         "parameters": {
-            "Code": {"v": template, "r": False},
+            "Code": {"v": expected_source, "r": False},
             "RuntimeMessageLevel": {"v": 0, "r": True},
             "IsSDKMode": {"v": False, "r": True}
-        }
+        },
+        "inputs": [{"name": "x", "index": 0}, {"name": "y", "index": 1}],
+        "outputs": [{"name": "a", "index": 0}]
     }
 
     respx.post(f"{HOST_URL}/create").mock(
-        return_value=httpx.Response(200, json={"status": "success", "id": node_id})
-    )
-    respx.get(f"{HOST_URL}/node/{node_id}").mock(
         side_effect=[
-            httpx.Response(200, json=initial_details),
-            httpx.Response(200, json=verified_details)
+            httpx.Response(200, json={"status": "success", "id": template_node_id}),
+            httpx.Response(200, json={"status": "success", "id": node_id})
         ]
     )
-    respx.patch(f"{HOST_URL}/update/{node_id}").mock(
-        return_value=httpx.Response(200, json={"status": "success", "id": node_id})
+    respx.get(f"{HOST_URL}/node/{template_node_id}").mock(
+        return_value=httpx.Response(200, json=initial_details)
+    )
+    respx.delete(f"{HOST_URL}/node/{template_node_id}").mock(
+        return_value=httpx.Response(
+            200,
+            json={"status": "success", "id": template_node_id}
+        )
+    )
+    respx.get(f"{HOST_URL}/node/{node_id}").mock(
+        return_value=httpx.Response(200, json=verified_details)
     )
 
     result = json.loads(await create_script_node(
@@ -184,9 +204,62 @@ async def test_create_script_node_supports_python_template():
     create_request = json.loads(respx.calls[0].request.content)
     assert create_request["type"] == "Python3Component"
 
-    update_request = json.loads(respx.calls[2].request.content)
-    injected_code = update_request["parameters"]["Code"]
+    final_create_request = json.loads(respx.calls[3].request.content)
+    injected_code = final_create_request["parameters"]["Code"]
     assert injected_code == "a = f'{x}: {y}'\n"
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_create_script_node_rejects_unpersisted_source_and_cleans_up():
+    template_node_id = "template-guid"
+    node_id = "script-guid"
+    template = """public class Script_Instance : GH_ScriptInstance
+{
+    private void RunScript(object x, ref object a)
+    {
+        a = null;
+    }
+}
+"""
+    respx.post(f"{HOST_URL}/create").mock(
+        side_effect=[
+            httpx.Response(200, json={"status": "success", "id": template_node_id}),
+            httpx.Response(200, json={"status": "success", "id": node_id})
+        ]
+    )
+    respx.get(f"{HOST_URL}/node/{template_node_id}").mock(
+        return_value=httpx.Response(
+            200,
+            json={"id": template_node_id, "parameters": {"Code": {"v": template}}}
+        )
+    )
+    respx.delete(f"{HOST_URL}/node/{template_node_id}").mock(
+        return_value=httpx.Response(200, json={"status": "success"})
+    )
+    respx.get(f"{HOST_URL}/node/{node_id}").mock(
+        return_value=httpx.Response(200, json={
+            "id": node_id,
+            "parameters": {
+                "Code": {"v": template},
+                "RuntimeMessageLevel": {"v": 0},
+                "IsSDKMode": {"v": True}
+            }
+        })
+    )
+    final_delete = respx.delete(f"{HOST_URL}/node/{node_id}").mock(
+        return_value=httpx.Response(200, json={"status": "success"})
+    )
+
+    result = json.loads(await create_script_node(
+        name="Generated Script",
+        canvas_x=300,
+        canvas_y=400,
+        script_body="a = x;"
+    ))
+
+    assert result["status"] == "error"
+    assert "did not persist" in result["message"]
+    assert final_delete.called
 
 @pytest.mark.asyncio
 @respx.mock
