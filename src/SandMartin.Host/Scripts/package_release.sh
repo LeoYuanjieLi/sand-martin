@@ -3,8 +3,8 @@
 # Exit on error
 set -e
 
-# Version and paths (Use first argument or default to 0.4.0)
-VERSION="${1:-0.4.0}"
+# Version and paths (Use first argument or default to 0.4.1)
+VERSION="${1:-0.4.1}"
 PROJECT_ROOT="$(pwd)"
 BIN_DIR="src/SandMartin.Host/bin"
 DIST_DIR="dist"

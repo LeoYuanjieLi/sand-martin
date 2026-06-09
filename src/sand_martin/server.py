@@ -246,9 +246,9 @@ async def create_script_node(
     """
     Creates and validates a Rhino 8 C# or Python 3 scripting component.
 
-    The tool creates the component before injecting code and reads its actual inputs,
-    outputs, and source format. C# code replaces the generated RunScript body.
-    Python code is injected as Rhino's top-level script body.
+    The tool reads Rhino's source template from a temporary component, then creates
+    the final component with code in the same request. C# code replaces the generated
+    RunScript body. Python code is injected as Rhino's top-level script body.
 
     Args:
         name: The component nickname.
@@ -278,44 +278,67 @@ async def create_script_node(
         f"Tool called: create_script_node (name={name}, language={normalized_language})"
     )
 
-    create_result = json.loads(await _make_request("POST", "/create", {
+    template_result = json.loads(await _make_request("POST", "/create", {
         "type": component_type,
-        "name": name,
+        "name": f"{name} Template",
         "canvasX": canvas_x,
         "canvasY": canvas_y,
         "parameters": {}
     }))
-    if create_result.get("status") != "success" or not create_result.get("id"):
-        return json.dumps(create_result)
+    if template_result.get("status") != "success" or not template_result.get("id"):
+        return json.dumps(template_result)
 
-    node_id = create_result["id"]
+    template_node_id = template_result["id"]
     try:
-        details = json.loads(await _make_request("GET", f"/node/{node_id}"))
+        details = json.loads(await _make_request("GET", f"/node/{template_node_id}"))
         code_detail = details.get("parameters", {}).get("Code")
         template = code_detail.get("v") if isinstance(code_detail, dict) else None
         if not template:
-            await _delete_failed_node(node_id)
             return json.dumps({
                 "status": "error",
                 "message": "Created script component did not expose editable code"
             })
 
         source = replace_body(template, script_body)
-        update_result = json.loads(await _make_request("PATCH", f"/update/{node_id}", {
-            "parameters": {"Code": source}
-        }))
-        if update_result.get("status") != "success":
-            await _delete_failed_node(node_id)
-            return json.dumps(update_result)
+    except Exception as e:
+        logger.error(f"Failed to read script template: {e}")
+        return json.dumps({"status": "error", "message": str(e)})
+    finally:
+        await _delete_failed_node(template_node_id)
 
+    create_result = json.loads(await _make_request("POST", "/create", {
+        "type": component_type,
+        "name": name,
+        "canvasX": canvas_x,
+        "canvasY": canvas_y,
+        "parameters": {"Code": source}
+    }))
+    if create_result.get("status") != "success" or not create_result.get("id"):
+        return json.dumps(create_result)
+
+    node_id = create_result["id"]
+    try:
         verified = json.loads(await _make_request("GET", f"/node/{node_id}"))
         parameters = verified.get("parameters", {})
+        verified_code_detail = parameters.get("Code", {})
+        verified_source = (
+            verified_code_detail.get("v")
+            if isinstance(verified_code_detail, dict)
+            else None
+        )
         runtime_detail = parameters.get("RuntimeMessageLevel", {})
         runtime_level = runtime_detail.get("v") if isinstance(runtime_detail, dict) else None
         sdk_detail = parameters.get("IsSDKMode", {})
         sdk_mode = sdk_detail.get("v") if isinstance(sdk_detail, dict) else None
 
         validation_errors = []
+        if (
+            not isinstance(verified_source, str)
+            or verified_source.replace("\r\n", "\n") != source.replace("\r\n", "\n")
+        ):
+            validation_errors.append(
+                "The script component did not persist the requested source code"
+            )
         if runtime_level != 0:
             validation_errors.append(
                 parameters.get("InstanceDescription", {}).get(
@@ -337,6 +360,7 @@ async def create_script_node(
         }
         if validation_errors:
             result["message"] = " ".join(validation_errors)
+            await _delete_failed_node(node_id)
         return json.dumps(result)
     except Exception as e:
         logger.error(f"Failed to create script node: {e}")
