@@ -8,6 +8,9 @@ from sand_martin.server import (
     create_node,
     create_script_node,
     update_node,
+    add_component_parameter,
+    update_component_parameter,
+    remove_component_parameter,
     delete_node,
     connect_nodes,
     disconnect_nodes,
@@ -279,6 +282,128 @@ async def test_update_node():
     assert request_data["name"] == "New Name"
     assert request_data["canvasX"] == 150
     assert "canvasY" not in request_data
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_add_component_parameter():
+    node_id = "script-guid"
+    route = respx.post(f"{HOST_URL}/node/{node_id}/parameter").mock(
+        return_value=httpx.Response(200, json={"status": "success", "index": 2})
+    )
+
+    result = await add_component_parameter(
+        node_id=node_id,
+        side="input",
+        name="radius",
+        nickname="r",
+        index=2,
+        access="item",
+        optional=True,
+        parameter_type="generic"
+    )
+
+    assert json.loads(result)["status"] == "success"
+    assert route.called
+
+    request_data = json.loads(respx.calls.last.request.content)
+    assert request_data == {
+        "side": "input",
+        "name": "radius",
+        "access": "item",
+        "optional": True,
+        "parameterType": "generic",
+        "nickname": "r",
+        "index": 2
+    }
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_add_component_parameter_omits_optional_fields_when_unset():
+    node_id = "script-guid"
+    respx.post(f"{HOST_URL}/node/{node_id}/parameter").mock(
+        return_value=httpx.Response(200, json={"status": "success", "index": 1})
+    )
+
+    result = await add_component_parameter(node_id=node_id, name="height")
+
+    assert json.loads(result)["status"] == "success"
+
+    request_data = json.loads(respx.calls.last.request.content)
+    assert request_data == {
+        "side": "input",
+        "name": "height",
+        "access": "item",
+        "optional": True,
+        "parameterType": "generic"
+    }
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_component_parameter():
+    node_id = "script-guid"
+    route = respx.patch(f"{HOST_URL}/node/{node_id}/parameter/input/0").mock(
+        return_value=httpx.Response(200, json={"status": "success", "index": 0})
+    )
+
+    result = await update_component_parameter(
+        node_id=node_id,
+        side="input",
+        index=0,
+        name="height",
+        nickname="h",
+        description="Extrusion height",
+        access="list",
+        optional=False
+    )
+
+    assert json.loads(result)["status"] == "success"
+    assert route.called
+
+    request_data = json.loads(respx.calls.last.request.content)
+    assert request_data == {
+        "name": "height",
+        "nickname": "h",
+        "description": "Extrusion height",
+        "access": "list",
+        "optional": False
+    }
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_component_parameter_omits_unset_fields():
+    node_id = "script-guid"
+    respx.patch(f"{HOST_URL}/node/{node_id}/parameter/output/1").mock(
+        return_value=httpx.Response(200, json={"status": "success", "index": 1})
+    )
+
+    result = await update_component_parameter(
+        node_id=node_id,
+        side="output",
+        index=1,
+        nickname="result"
+    )
+
+    assert json.loads(result)["status"] == "success"
+
+    request_data = json.loads(respx.calls.last.request.content)
+    assert request_data == {"nickname": "result"}
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_remove_component_parameter():
+    node_id = "script-guid"
+    route = respx.delete(f"{HOST_URL}/node/{node_id}/parameter/output/1").mock(
+        return_value=httpx.Response(200, json={"status": "success", "index": 1})
+    )
+
+    result = await remove_component_parameter(
+        node_id=node_id,
+        side="output",
+        index=1
+    )
+
+    assert json.loads(result)["status"] == "success"
+    assert route.called
 
 @pytest.mark.asyncio
 @respx.mock
