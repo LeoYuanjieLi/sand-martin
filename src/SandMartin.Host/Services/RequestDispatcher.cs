@@ -93,7 +93,16 @@ namespace SandMartin.Host.Services
                                 responseBody = await _canvasManager.DisconnectNode(discReq);
                                 break;
                             default:
-                                response.StatusCode = (int)HttpStatusCode.NotFound;
+                                if (TryParseParameterRoute(path, out var route) && route.IsCollection)
+                                {
+                                    var paramReq = JsonConvert.DeserializeObject<ComponentParameterRequest>(body) ?? new ComponentParameterRequest();
+                                    paramReq.NodeId = route.NodeId;
+                                    responseBody = await _canvasManager.AddComponentParameter(paramReq);
+                                }
+                                else
+                                {
+                                    response.StatusCode = (int)HttpStatusCode.NotFound;
+                                }
                                 break;
                         }
                     }
@@ -120,6 +129,14 @@ namespace SandMartin.Host.Services
                                 responseBody = await _canvasManager.UpdateNode(updateReq);
                             }
                         }
+                        else if (TryParseParameterRoute(path, out var route) && !route.IsCollection)
+                        {
+                            var updateReq = JsonConvert.DeserializeObject<UpdateComponentParameterRequest>(body) ?? new UpdateComponentParameterRequest();
+                            updateReq.NodeId = route.NodeId;
+                            updateReq.Side = route.Side;
+                            updateReq.Index = route.Index.Value;
+                            responseBody = await _canvasManager.UpdateComponentParameter(updateReq);
+                        }
                         else
                         {
                             response.StatusCode = (int)HttpStatusCode.NotFound;
@@ -128,7 +145,15 @@ namespace SandMartin.Host.Services
                 }
                 else if (method == "DELETE")
                 {
-                    if (path.StartsWith("/node/"))
+                    if (TryParseParameterRoute(path, out var route) && !route.IsCollection)
+                    {
+                        responseBody = await _canvasManager.RemoveComponentParameter(new ComponentParameterRequest {
+                            NodeId = route.NodeId,
+                            Side = route.Side,
+                            Index = route.Index
+                        });
+                    }
+                    else if (path.StartsWith("/node/"))
                     {
                         var nodeId = path.Substring("/node/".Length);
                         responseBody = await _canvasManager.DeleteNode(nodeId);
@@ -160,6 +185,54 @@ namespace SandMartin.Host.Services
             {
                 response.Close();
             }
+        }
+
+        internal static bool TryParseParameterRoute(string path, out ParameterRoute route)
+        {
+            route = null;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            var parts = path.Trim('/').Split('/');
+            if (parts.Length == 3 &&
+                parts[0] == "node" &&
+                parts[2] == "parameter" &&
+                !string.IsNullOrWhiteSpace(parts[1]))
+            {
+                route = new ParameterRoute(parts[1], null, null, true);
+                return true;
+            }
+
+            if (parts.Length == 5 &&
+                parts[0] == "node" &&
+                parts[2] == "parameter" &&
+                !string.IsNullOrWhiteSpace(parts[1]) &&
+                !string.IsNullOrWhiteSpace(parts[3]) &&
+                int.TryParse(parts[4], out var index))
+            {
+                route = new ParameterRoute(parts[1], parts[3], index, false);
+                return true;
+            }
+
+            return false;
+        }
+
+        internal sealed class ParameterRoute
+        {
+            public ParameterRoute(string nodeId, string side, int? index, bool isCollection)
+            {
+                NodeId = nodeId;
+                Side = side;
+                Index = index;
+                IsCollection = isCollection;
+            }
+
+            public string NodeId { get; }
+            public string Side { get; }
+            public int? Index { get; }
+            public bool IsCollection { get; }
         }
     }
 }

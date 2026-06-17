@@ -27,5 +27,38 @@ namespace SandMartin.Host.Tests
             // Assert
             Assert.NotNull(dispatcher);
         }
+
+        [Fact]
+        public void TryParseParameterRoute_CollectionRoute_ReturnsNodeId()
+        {
+            var parsed = RequestDispatcher.TryParseParameterRoute("/node/abc-123/parameter", out var route);
+
+            Assert.True(parsed);
+            Assert.Equal("abc-123", route.NodeId);
+            Assert.True(route.IsCollection);
+            Assert.Null(route.Side);
+            Assert.Null(route.Index);
+        }
+
+        [Fact]
+        public void TryParseParameterRoute_IndexedRoute_ReturnsSideAndIndex()
+        {
+            var parsed = RequestDispatcher.TryParseParameterRoute("/node/abc-123/parameter/input/2", out var route);
+
+            Assert.True(parsed);
+            Assert.Equal("abc-123", route.NodeId);
+            Assert.Equal("input", route.Side);
+            Assert.Equal(2, route.Index);
+            Assert.False(route.IsCollection);
+        }
+
+        [Fact]
+        public void TryParseParameterRoute_InvalidRoute_ReturnsFalse()
+        {
+            var parsed = RequestDispatcher.TryParseParameterRoute("/node/abc-123", out var route);
+
+            Assert.False(parsed);
+            Assert.Null(route);
+        }
     }
 }
