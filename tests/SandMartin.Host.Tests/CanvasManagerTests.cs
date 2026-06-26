@@ -130,6 +130,79 @@ namespace SandMartin.Host.Tests
         }
 
         [Fact]
+        public async Task AddComponentParameter_NotRunningInRhino_ReturnsErrorJson()
+        {
+            var manager = new CanvasManager();
+            var request = new ComponentParameterRequest
+            {
+                NodeId = Guid.NewGuid().ToString(),
+                Side = "input",
+                Name = "radius"
+            };
+
+            var jsonResult = await manager.AddComponentParameter(request);
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+
+            Assert.Equal("error", response["status"]);
+            Assert.Equal("No active Grasshopper document", response["message"]);
+        }
+
+        [Fact]
+        public async Task UpdateComponentParameter_NotRunningInRhino_ReturnsErrorJson()
+        {
+            var manager = new CanvasManager();
+            var request = new UpdateComponentParameterRequest
+            {
+                NodeId = Guid.NewGuid().ToString(),
+                Side = "input",
+                Index = 0,
+                Name = "height"
+            };
+
+            var jsonResult = await manager.UpdateComponentParameter(request);
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+
+            Assert.Equal("error", response["status"]);
+            Assert.Equal("No active Grasshopper document", response["message"]);
+        }
+
+        [Fact]
+        public async Task RemoveComponentParameter_NotRunningInRhino_ReturnsErrorJson()
+        {
+            var manager = new CanvasManager();
+            var request = new ComponentParameterRequest
+            {
+                NodeId = Guid.NewGuid().ToString(),
+                Side = "output",
+                Index = 0
+            };
+
+            var jsonResult = await manager.RemoveComponentParameter(request);
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+
+            Assert.Equal("error", response["status"]);
+            Assert.Equal("No active Grasshopper document", response["message"]);
+        }
+
+        [Fact]
+        public async Task AddComponentParameter_InvalidSide_ReturnsValidationError()
+        {
+            var manager = new CanvasManager();
+            var request = new ComponentParameterRequest
+            {
+                NodeId = Guid.NewGuid().ToString(),
+                Side = "left",
+                Name = "radius"
+            };
+
+            var jsonResult = await manager.AddComponentParameter(request);
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+
+            Assert.Equal("error", response["status"]);
+            Assert.Equal("Parameter side must be 'input' or 'output'", response["message"]);
+        }
+
+        [Fact]
         public async Task CreateConnection_NotRunningInRhino_ReturnsErrorJson()
         {
             // Arrange

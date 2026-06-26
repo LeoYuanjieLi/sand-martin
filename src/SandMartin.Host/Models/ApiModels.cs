@@ -54,6 +54,63 @@ namespace SandMartin.Host.Models
         public int TargetInputIndex { get; set; }
     }
 
+    public class ComponentParameterRequest
+    {
+        [JsonProperty("nodeId")]
+        public string NodeId { get; set; }
+
+        [JsonProperty("side")]
+        public string Side { get; set; }
+
+        [JsonProperty("index")]
+        public int? Index { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("nickname")]
+        public string Nickname { get; set; }
+
+        [JsonProperty("description")]
+        public string Description { get; set; }
+
+        [JsonProperty("access")]
+        public string Access { get; set; }
+
+        [JsonProperty("optional")]
+        public bool? Optional { get; set; }
+
+        [JsonProperty("parameterType")]
+        public string ParameterType { get; set; }
+    }
+
+    public class UpdateComponentParameterRequest
+    {
+        [JsonProperty("nodeId")]
+        public string NodeId { get; set; }
+
+        [JsonProperty("side")]
+        public string Side { get; set; }
+
+        [JsonProperty("index")]
+        public int Index { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("nickname")]
+        public string Nickname { get; set; }
+
+        [JsonProperty("description")]
+        public string Description { get; set; }
+
+        [JsonProperty("access")]
+        public string Access { get; set; }
+
+        [JsonProperty("optional")]
+        public bool? Optional { get; set; }
+    }
+
     public class DisconnectRequest
     {
         [JsonProperty("source_id")]
@@ -115,6 +172,18 @@ namespace SandMartin.Host.Models
 
         [JsonProperty("index")]
         public int Index { get; set; }
+
+        [JsonProperty("description")]
+        public string Description { get; set; }
+
+        [JsonProperty("access")]
+        public string Access { get; set; }
+
+        [JsonProperty("optional")]
+        public bool Optional { get; set; }
+
+        [JsonProperty("type")]
+        public string Type { get; set; }
 
         [JsonProperty("connections")]
         public List<ConnectionInfo> Connections { get; set; } = new List<ConnectionInfo>();

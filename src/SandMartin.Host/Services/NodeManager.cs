@@ -90,7 +90,7 @@ namespace SandMartin.Host.Services
                         for (int i = 0; i < component.Params.Input.Count; i++)
                         {
                             var p = component.Params.Input[i];
-                            var paramInfo = new Models.ParameterInfo { Name = p.Name, Nickname = p.NickName, Index = i };
+                            var paramInfo = CreateParameterInfo(p, i);
                             foreach (var source in p.Sources)
                             {
                                 paramInfo.Connections.Add(new ConnectionInfo {
@@ -104,7 +104,7 @@ namespace SandMartin.Host.Services
                         for (int i = 0; i < component.Params.Output.Count; i++)
                         {
                             var p = component.Params.Output[i];
-                            nodeInfo.Outputs.Add(new Models.ParameterInfo { Name = p.Name, Nickname = p.NickName, Index = i });
+                            nodeInfo.Outputs.Add(CreateParameterInfo(p, i));
                         }
                     }
 
@@ -288,6 +288,265 @@ namespace SandMartin.Host.Services
             }
 
             return Task.FromResult(JsonConvert.SerializeObject(new { status = "error", message = "No active Grasshopper document" }));
+        }
+
+        public virtual Task<string> AddComponentParameter(ComponentParameterRequest request)
+        {
+            var validationError = ValidateParameterMutationRequest(request, requireIndex: false);
+            if (validationError != null)
+            {
+                return Task.FromResult(Error(validationError));
+            }
+
+            try {
+                if (IsRunningInRhino())
+                {
+                    return AddRhinoComponentParameter(request);
+                }
+            } catch {
+            }
+
+            return Task.FromResult(Error("No active Grasshopper document"));
+        }
+
+        public virtual Task<string> UpdateComponentParameter(UpdateComponentParameterRequest request)
+        {
+            if (request == null)
+            {
+                return Task.FromResult(Error("Parameter request body is required"));
+            }
+
+            var validationError = ValidateParameterSide(request.Side);
+            if (validationError != null)
+            {
+                return Task.FromResult(Error(validationError));
+            }
+
+            if (string.IsNullOrWhiteSpace(request.NodeId))
+            {
+                return Task.FromResult(Error("Node ID is required"));
+            }
+
+            if (request.Index < 0)
+            {
+                return Task.FromResult(Error("Parameter index must be greater than or equal to zero"));
+            }
+
+            try {
+                if (IsRunningInRhino())
+                {
+                    return UpdateRhinoComponentParameter(request);
+                }
+            } catch {
+            }
+
+            return Task.FromResult(Error("No active Grasshopper document"));
+        }
+
+        public virtual Task<string> RemoveComponentParameter(ComponentParameterRequest request)
+        {
+            var validationError = ValidateParameterMutationRequest(request, requireIndex: true);
+            if (validationError != null)
+            {
+                return Task.FromResult(Error(validationError));
+            }
+
+            try {
+                if (IsRunningInRhino())
+                {
+                    return RemoveRhinoComponentParameter(request);
+                }
+            } catch {
+            }
+
+            return Task.FromResult(Error("No active Grasshopper document"));
+        }
+
+        private Task<string> AddRhinoComponentParameter(ComponentParameterRequest request)
+        {
+            var tcs = new TaskCompletionSource<string>();
+
+            Rhino.RhinoApp.InvokeOnUiThread(new Action(() => {
+                try {
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+                    if (doc == null) {
+                        tcs.SetResult(Error("No active Grasshopper document"));
+                        return;
+                    }
+
+                    if (!TryFindComponent(doc, request.NodeId, out var component, out var error)) {
+                        tcs.SetResult(Error(error));
+                        return;
+                    }
+
+                    var side = ToParameterSide(request.Side);
+                    int index = request.Index ?? GetParameterList(component, side).Count;
+                    if (index < 0 || index > GetParameterList(component, side).Count) {
+                        tcs.SetResult(Error("Parameter index is outside the valid insertion range"));
+                        return;
+                    }
+
+                    var variable = component as IGH_VariableParameterComponent;
+                    if (variable == null) {
+                        tcs.SetResult(Error("Component type does not support variable parameters"));
+                        return;
+                    }
+
+                    if (!variable.CanInsertParameter(side, index)) {
+                        tcs.SetResult(Error($"Component rejected inserting a {request.Side} parameter at index {index}"));
+                        return;
+                    }
+
+                    var param = variable.CreateParameter(side, index);
+                    if (param == null) {
+                        tcs.SetResult(Error("Component did not create a parameter"));
+                        return;
+                    }
+
+                    var propertyError = ApplyParameterProperties(component, param, request.Name, request.Nickname, request.Description, request.Access, request.Optional);
+                    if (propertyError != null) {
+                        tcs.SetResult(Error(propertyError));
+                        return;
+                    }
+
+                    bool registered = side == GH_ParameterSide.Input
+                        ? component.Params.RegisterInputParam(param, index)
+                        : component.Params.RegisterOutputParam(param, index);
+
+                    if (!registered) {
+                        tcs.SetResult(Error("Failed to register component parameter"));
+                        return;
+                    }
+
+                    variable.VariableParameterMaintenance();
+                    var maintainedParam = GetParameterList(component, side)[index];
+                    propertyError = ApplyParameterProperties(component, maintainedParam, request.Name, request.Nickname, request.Description, request.Access, request.Optional);
+                    if (propertyError != null) {
+                        tcs.SetResult(Error(propertyError));
+                        return;
+                    }
+
+                    RefreshComponent(component);
+                    tcs.SetResult(JsonConvert.SerializeObject(new { status = "success", id = component.InstanceGuid.ToString(), index = index }));
+                } catch (Exception ex) {
+                    tcs.SetResult(Error(ex.Message));
+                }
+            }));
+
+            return tcs.Task;
+        }
+
+        private Task<string> UpdateRhinoComponentParameter(UpdateComponentParameterRequest request)
+        {
+            var tcs = new TaskCompletionSource<string>();
+
+            Rhino.RhinoApp.InvokeOnUiThread(new Action(() => {
+                try {
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+                    if (doc == null) {
+                        tcs.SetResult(Error("No active Grasshopper document"));
+                        return;
+                    }
+
+                    if (!TryFindComponent(doc, request.NodeId, out var component, out var error)) {
+                        tcs.SetResult(Error(error));
+                        return;
+                    }
+
+                    var side = ToParameterSide(request.Side);
+                    var parameters = GetParameterList(component, side);
+                    if (request.Index < 0 || request.Index >= parameters.Count) {
+                        tcs.SetResult(Error("Parameter index is outside the valid range"));
+                        return;
+                    }
+
+                    var param = parameters[request.Index];
+                    var propertyError = ApplyParameterProperties(component, param, request.Name, request.Nickname, request.Description, request.Access, request.Optional);
+                    if (propertyError != null) {
+                        tcs.SetResult(Error(propertyError));
+                        return;
+                    }
+
+                    if (component is IGH_VariableParameterComponent variable) {
+                        variable.VariableParameterMaintenance();
+                        var maintainedParam = GetParameterList(component, side)[request.Index];
+                        propertyError = ApplyParameterProperties(component, maintainedParam, request.Name, request.Nickname, request.Description, request.Access, request.Optional);
+                        if (propertyError != null) {
+                            tcs.SetResult(Error(propertyError));
+                            return;
+                        }
+                    }
+
+                    RefreshComponent(component);
+                    tcs.SetResult(JsonConvert.SerializeObject(new { status = "success", id = component.InstanceGuid.ToString(), index = request.Index }));
+                } catch (Exception ex) {
+                    tcs.SetResult(Error(ex.Message));
+                }
+            }));
+
+            return tcs.Task;
+        }
+
+        private Task<string> RemoveRhinoComponentParameter(ComponentParameterRequest request)
+        {
+            var tcs = new TaskCompletionSource<string>();
+
+            Rhino.RhinoApp.InvokeOnUiThread(new Action(() => {
+                try {
+                    var doc = Grasshopper.Instances.ActiveCanvas?.Document;
+                    if (doc == null) {
+                        tcs.SetResult(Error("No active Grasshopper document"));
+                        return;
+                    }
+
+                    if (!TryFindComponent(doc, request.NodeId, out var component, out var error)) {
+                        tcs.SetResult(Error(error));
+                        return;
+                    }
+
+                    var side = ToParameterSide(request.Side);
+                    var parameters = GetParameterList(component, side);
+                    int index = request.Index.Value;
+                    if (index < 0 || index >= parameters.Count) {
+                        tcs.SetResult(Error("Parameter index is outside the valid range"));
+                        return;
+                    }
+
+                    var variable = component as IGH_VariableParameterComponent;
+                    if (variable == null) {
+                        tcs.SetResult(Error("Component type does not support variable parameters"));
+                        return;
+                    }
+
+                    if (!variable.CanRemoveParameter(side, index)) {
+                        tcs.SetResult(Error($"Component rejected removing the {request.Side} parameter at index {index}"));
+                        return;
+                    }
+
+                    var param = parameters[index];
+                    if (!variable.DestroyParameter(side, index)) {
+                        tcs.SetResult(Error($"Component rejected destroying the {request.Side} parameter at index {index}"));
+                        return;
+                    }
+
+                    bool unregistered = side == GH_ParameterSide.Input
+                        ? component.Params.UnregisterInputParameter(param, true)
+                        : component.Params.UnregisterOutputParameter(param, true);
+
+                    if (!unregistered) {
+                        tcs.SetResult(Error("Failed to unregister component parameter"));
+                        return;
+                    }
+
+                    variable.VariableParameterMaintenance();
+                    RefreshComponent(component);
+                    tcs.SetResult(JsonConvert.SerializeObject(new { status = "success", id = component.InstanceGuid.ToString(), index = index }));
+                } catch (Exception ex) {
+                    tcs.SetResult(Error(ex.Message));
+                }
+            }));
+
+            return tcs.Task;
         }
 
         private Task<string> UpdateRhinoNode(UpdateNodeRequest request)
@@ -491,6 +750,207 @@ namespace SandMartin.Host.Services
             }));
 
             return tcs.Task;
+        }
+
+        internal static Models.ParameterInfo CreateParameterInfo(IGH_Param parameter, int index)
+        {
+            return new Models.ParameterInfo {
+                Name = parameter.Name,
+                Nickname = parameter.NickName,
+                Index = index,
+                Description = parameter.Description,
+                Access = parameter.Access.ToString().ToLowerInvariant(),
+                Optional = parameter.Optional,
+                Type = parameter.GetType().Name
+            };
+        }
+
+        internal static bool IsValidIdentifier(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            if (!(char.IsLetter(value[0]) || value[0] == '_'))
+            {
+                return false;
+            }
+
+            for (int i = 1; i < value.Length; i++)
+            {
+                if (!(char.IsLetterOrDigit(value[i]) || value[i] == '_'))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        internal static bool TryParseAccess(string access, out GH_ParamAccess paramAccess)
+        {
+            paramAccess = GH_ParamAccess.item;
+            if (string.IsNullOrWhiteSpace(access))
+            {
+                return true;
+            }
+
+            switch (access.Trim().ToLowerInvariant())
+            {
+                case "item":
+                    paramAccess = GH_ParamAccess.item;
+                    return true;
+                case "list":
+                    paramAccess = GH_ParamAccess.list;
+                    return true;
+                case "tree":
+                    paramAccess = GH_ParamAccess.tree;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static string ApplyParameterProperties(IGH_Component component, IGH_Param param, string name, string nickname, string description, string access, bool? optional)
+        {
+            var variableName = !string.IsNullOrWhiteSpace(nickname) ? nickname : name;
+            if (ScriptInjector.GetComponentCode(component) != null && !string.IsNullOrWhiteSpace(variableName) && !IsValidIdentifier(variableName))
+            {
+                return $"Script parameter name '{variableName}' is not a valid C# identifier";
+            }
+
+            if (!TryParseAccess(access, out var paramAccess))
+            {
+                return $"Parameter access '{access}' is invalid. Use item, list, or tree.";
+            }
+
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                param.Name = name;
+            }
+
+            if (!string.IsNullOrWhiteSpace(nickname))
+            {
+                param.NickName = nickname;
+            }
+            else if (!string.IsNullOrWhiteSpace(name))
+            {
+                param.NickName = name;
+            }
+
+            if (description != null)
+            {
+                param.Description = description;
+            }
+
+            if (!string.IsNullOrWhiteSpace(access))
+            {
+                param.Access = paramAccess;
+            }
+
+            if (optional.HasValue)
+            {
+                param.Optional = optional.Value;
+            }
+
+            return null;
+        }
+
+        private static void RefreshComponent(IGH_Component component)
+        {
+            component.Params.OnParametersChanged();
+            component.Attributes?.ExpireLayout();
+            component.ExpireSolution(true);
+        }
+
+        private static IList<IGH_Param> GetParameterList(IGH_Component component, GH_ParameterSide side)
+        {
+            return side == GH_ParameterSide.Input ? component.Params.Input : component.Params.Output;
+        }
+
+        private static GH_ParameterSide ToParameterSide(string side)
+        {
+            return string.Equals(side, "output", StringComparison.OrdinalIgnoreCase)
+                ? GH_ParameterSide.Output
+                : GH_ParameterSide.Input;
+        }
+
+        private static string ValidateParameterMutationRequest(ComponentParameterRequest request, bool requireIndex)
+        {
+            if (request == null)
+            {
+                return "Parameter request body is required";
+            }
+
+            if (string.IsNullOrWhiteSpace(request.NodeId))
+            {
+                return "Node ID is required";
+            }
+
+            var sideError = ValidateParameterSide(request.Side);
+            if (sideError != null)
+            {
+                return sideError;
+            }
+
+            if (requireIndex && !request.Index.HasValue)
+            {
+                return "Parameter index is required";
+            }
+
+            if (request.Index.HasValue && request.Index.Value < 0)
+            {
+                return "Parameter index must be greater than or equal to zero";
+            }
+
+            return null;
+        }
+
+        private static string ValidateParameterSide(string side)
+        {
+            if (string.IsNullOrWhiteSpace(side))
+            {
+                return "Parameter side is required";
+            }
+
+            if (!string.Equals(side, "input", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(side, "output", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Parameter side must be 'input' or 'output'";
+            }
+
+            return null;
+        }
+
+        private static bool TryFindComponent(Grasshopper.Kernel.GH_Document doc, string nodeId, out IGH_Component component, out string error)
+        {
+            component = null;
+            error = null;
+
+            if (!Guid.TryParse(nodeId, out Guid guid)) {
+                error = "Invalid node ID format";
+                return false;
+            }
+
+            var obj = doc.FindObject(guid, true);
+            if (obj == null) {
+                error = "Node not found";
+                return false;
+            }
+
+            component = obj as IGH_Component;
+            if (component == null) {
+                error = "Node is not a component";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static string Error(string message)
+        {
+            return JsonConvert.SerializeObject(new { status = "error", message = message });
         }
     }
 }

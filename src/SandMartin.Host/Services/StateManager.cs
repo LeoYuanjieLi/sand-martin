@@ -75,7 +75,7 @@ namespace SandMartin.Host.Services
                             for (int i = 0; i < component.Params.Input.Count; i++)
                             {
                                 var p = component.Params.Input[i];
-                                var paramInfo = new Models.ParameterInfo { Name = p.Name, Nickname = p.NickName, Index = i };
+                                var paramInfo = NodeManager.CreateParameterInfo(p, i);
                                 foreach (var source in p.Sources)
                                 {
                                     paramInfo.Connections.Add(new ConnectionInfo {
@@ -89,7 +89,7 @@ namespace SandMartin.Host.Services
                             for (int i = 0; i < component.Params.Output.Count; i++)
                             {
                                 var p = component.Params.Output[i];
-                                node.Outputs.Add(new Models.ParameterInfo { Name = p.Name, Nickname = p.NickName, Index = i });
+                                node.Outputs.Add(NodeManager.CreateParameterInfo(p, i));
                             }
                         }
 

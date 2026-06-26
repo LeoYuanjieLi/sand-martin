@@ -27,6 +27,12 @@ namespace SandMartin.Host.Services
         public virtual Task<string> CreateNode(CreateNodeRequest request) => _nodeManager.CreateNode(request);
         
         public virtual Task<string> UpdateNode(UpdateNodeRequest request) => _nodeManager.UpdateNode(request);
+
+        public virtual Task<string> AddComponentParameter(ComponentParameterRequest request) => _nodeManager.AddComponentParameter(request);
+
+        public virtual Task<string> UpdateComponentParameter(UpdateComponentParameterRequest request) => _nodeManager.UpdateComponentParameter(request);
+
+        public virtual Task<string> RemoveComponentParameter(ComponentParameterRequest request) => _nodeManager.RemoveComponentParameter(request);
         
         public virtual Task<string> DeleteNode(string nodeId) => _nodeManager.DeleteNode(nodeId);
         

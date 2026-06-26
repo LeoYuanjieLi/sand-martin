@@ -50,6 +50,12 @@ mcp = FastMCP(
     Use `create_script_node()` for C# or Python 3 scripts. For C#, pass only the
     RunScript method body. For Python, pass top-level statements and assign outputs
     such as `a`. The tool discovers Rhino's source format and validates the component.
+
+    COMPONENT PARAMETERS:
+    Use `add_component_parameter`, `update_component_parameter`, and
+    `remove_component_parameter` to modify component ports. These tools edit the
+    parameter schema, such as script inputs and outputs. Use `update_node(parameters=...)`
+    only for setting component properties or values on existing inputs.
     """
 )
 
@@ -393,6 +399,116 @@ async def update_node(
     if parameters is not None: data["parameters"] = parameters
 
     return await _make_request("PATCH", f"/update/{node_id}", data)
+
+@mcp.tool()
+async def add_component_parameter(
+    node_id: str,
+    name: str,
+    side: str = "input",
+    nickname: Optional[str] = None,
+    description: Optional[str] = None,
+    index: Optional[int] = None,
+    access: str = "item",
+    optional: bool = True,
+    parameter_type: str = "generic"
+) -> str:
+    """
+    Adds an input or output parameter to a variable-parameter Grasshopper component.
+
+    This modifies the component's port schema. It does not set a value on an
+    existing input; use `update_node(parameters=...)` for value/property updates.
+
+    Args:
+        node_id: The unique ID (GUID) of the component to edit.
+        side: `input` or `output`.
+        name: The parameter name. For script components, use a valid variable name.
+        nickname: Optional displayed nickname/variable name.
+        description: Optional parameter description.
+        index: Optional insertion index. Defaults to appending on the host.
+        access: `item`, `list`, or `tree`.
+        optional: Whether the new parameter is optional.
+        parameter_type: Requested parameter type. Currently forwarded for host support.
+    """
+    logger.info(
+        f"Tool called: add_component_parameter (node_id={node_id}, side={side}, name={name})"
+    )
+    data = {
+        "side": side,
+        "name": name,
+        "access": access,
+        "optional": optional,
+        "parameterType": parameter_type
+    }
+    if nickname is not None:
+        data["nickname"] = nickname
+    if description is not None:
+        data["description"] = description
+    if index is not None:
+        data["index"] = index
+
+    return await _make_request("POST", f"/node/{node_id}/parameter", data)
+
+@mcp.tool()
+async def update_component_parameter(
+    node_id: str,
+    side: str,
+    index: int,
+    name: Optional[str] = None,
+    nickname: Optional[str] = None,
+    description: Optional[str] = None,
+    access: Optional[str] = None,
+    optional: Optional[bool] = None
+) -> str:
+    """
+    Updates metadata for an existing component input or output parameter.
+
+    This modifies the component's port schema. It does not set a value on an
+    existing input; use `update_node(parameters=...)` for value/property updates.
+
+    Args:
+        node_id: The unique ID (GUID) of the component to edit.
+        side: `input` or `output`.
+        index: The zero-based parameter index to update.
+        name: Optional new parameter name.
+        nickname: Optional new displayed nickname/variable name.
+        description: Optional parameter description.
+        access: Optional `item`, `list`, or `tree`.
+        optional: Optional parameter optional flag.
+    """
+    logger.info(
+        f"Tool called: update_component_parameter (node_id={node_id}, side={side}, index={index})"
+    )
+    data = {}
+    if name is not None:
+        data["name"] = name
+    if nickname is not None:
+        data["nickname"] = nickname
+    if description is not None:
+        data["description"] = description
+    if access is not None:
+        data["access"] = access
+    if optional is not None:
+        data["optional"] = optional
+
+    return await _make_request("PATCH", f"/node/{node_id}/parameter/{side}/{index}", data)
+
+@mcp.tool()
+async def remove_component_parameter(node_id: str, side: str, index: int) -> str:
+    """
+    Removes an input or output parameter from a variable-parameter component.
+
+    This modifies the component's port schema. It does not clear a value on an
+    existing input; use `update_node(parameters=...)` for value/property updates.
+
+    Args:
+        node_id: The unique ID (GUID) of the component to edit.
+        side: `input` or `output`.
+        index: The zero-based parameter index to remove.
+    """
+    logger.info(
+        f"Tool called: remove_component_parameter (node_id={node_id}, side={side}, index={index})"
+    )
+    return await _make_request("DELETE", f"/node/{node_id}/parameter/{side}/{index}")
 
 @mcp.tool()
 async def delete_node(node_id: str) -> str:
