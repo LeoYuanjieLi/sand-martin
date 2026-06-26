@@ -406,6 +406,7 @@ async def add_component_parameter(
     name: str,
     side: str = "input",
     nickname: Optional[str] = None,
+    description: Optional[str] = None,
     index: Optional[int] = None,
     access: str = "item",
     optional: bool = True,
@@ -422,6 +423,7 @@ async def add_component_parameter(
         side: `input` or `output`.
         name: The parameter name. For script components, use a valid variable name.
         nickname: Optional displayed nickname/variable name.
+        description: Optional parameter description.
         index: Optional insertion index. Defaults to appending on the host.
         access: `item`, `list`, or `tree`.
         optional: Whether the new parameter is optional.
@@ -439,6 +441,8 @@ async def add_component_parameter(
     }
     if nickname is not None:
         data["nickname"] = nickname
+    if description is not None:
+        data["description"] = description
     if index is not None:
         data["index"] = index
 

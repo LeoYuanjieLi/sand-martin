@@ -296,6 +296,7 @@ async def test_add_component_parameter():
         side="input",
         name="radius",
         nickname="r",
+        description="Input radius",
         index=2,
         access="item",
         optional=True,
@@ -313,6 +314,7 @@ async def test_add_component_parameter():
         "optional": True,
         "parameterType": "generic",
         "nickname": "r",
+        "description": "Input radius",
         "index": 2
     }
 
