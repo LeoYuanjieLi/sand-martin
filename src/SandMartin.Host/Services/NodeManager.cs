@@ -419,6 +419,13 @@ namespace SandMartin.Host.Services
                     }
 
                     variable.VariableParameterMaintenance();
+                    var maintainedParam = GetParameterList(component, side)[index];
+                    propertyError = ApplyParameterProperties(component, maintainedParam, request.Name, request.Nickname, request.Description, request.Access, request.Optional);
+                    if (propertyError != null) {
+                        tcs.SetResult(Error(propertyError));
+                        return;
+                    }
+
                     RefreshComponent(component);
                     tcs.SetResult(JsonConvert.SerializeObject(new { status = "success", id = component.InstanceGuid.ToString(), index = index }));
                 } catch (Exception ex) {
@@ -462,6 +469,12 @@ namespace SandMartin.Host.Services
 
                     if (component is IGH_VariableParameterComponent variable) {
                         variable.VariableParameterMaintenance();
+                        var maintainedParam = GetParameterList(component, side)[request.Index];
+                        propertyError = ApplyParameterProperties(component, maintainedParam, request.Name, request.Nickname, request.Description, request.Access, request.Optional);
+                        if (propertyError != null) {
+                            tcs.SetResult(Error(propertyError));
+                            return;
+                        }
                     }
 
                     RefreshComponent(component);
