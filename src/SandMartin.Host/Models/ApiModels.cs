@@ -120,6 +120,15 @@ namespace SandMartin.Host.Models
         public string TargetId { get; set; }
     }
 
+    public class ExportOutputRequest
+    {
+        [JsonProperty("path")]
+        public string Path { get; set; }
+
+        [JsonProperty("overwrite")]
+        public bool Overwrite { get; set; }
+    }
+
     public class CanvasStateResponse
     {
         [JsonProperty("nodes")]

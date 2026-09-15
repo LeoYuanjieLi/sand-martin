@@ -12,12 +12,14 @@ namespace SandMartin.Host.Services
         private readonly NodeManager _nodeManager;
         private readonly ConnectionManager _connectionManager;
         private readonly StateManager _stateManager;
+        private readonly CanvasOperationsManager _canvasOperationsManager;
 
         public CanvasManager()
         {
             _nodeManager = new NodeManager();
             _connectionManager = new ConnectionManager();
             _stateManager = new StateManager();
+            _canvasOperationsManager = new CanvasOperationsManager();
         }
 
         public virtual Task<string> GetCanvasState() => _stateManager.GetCanvasState();
@@ -39,5 +41,9 @@ namespace SandMartin.Host.Services
         public virtual Task<string> CreateConnection(ConnectionRequest request) => _connectionManager.CreateConnection(request);
         
         public virtual Task<string> DisconnectNode(DisconnectRequest request) => _connectionManager.DisconnectNode(request);
+
+        public virtual Task<string> ResetCanvas() => _canvasOperationsManager.ResetCanvas();
+
+        public virtual Task<string> ExportOutput(ExportOutputRequest request) => _canvasOperationsManager.ExportOutput(request);
     }
 }

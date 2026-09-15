@@ -255,5 +255,65 @@ namespace SandMartin.Host.Tests
             Assert.True(response.ContainsKey("message"), "Response should contain a 'message' field");
             Assert.Equal("No active Grasshopper document", response["message"]);
         }
+
+        [Fact]
+        public async Task ResetCanvas_NotRunningInRhino_ReturnsErrorJson()
+        {
+            var manager = new CanvasManager();
+
+            var jsonResult = await manager.ResetCanvas();
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+
+            Assert.Equal("error", response["status"]);
+            Assert.Equal("No active Grasshopper document", response["message"]);
+        }
+
+        [Fact]
+        public async Task ExportOutput_NullRequest_ReturnsValidationError()
+        {
+            var manager = new CanvasManager();
+
+            var jsonResult = await manager.ExportOutput(null);
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+
+            Assert.Equal("error", response["status"]);
+            Assert.Equal("Export request body is required", response["message"]);
+        }
+
+        [Fact]
+        public async Task ExportOutput_MissingPath_ReturnsValidationError()
+        {
+            var manager = new CanvasManager();
+
+            var jsonResult = await manager.ExportOutput(new ExportOutputRequest());
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+
+            Assert.Equal("error", response["status"]);
+            Assert.Equal("Export path is required", response["message"]);
+        }
+
+        [Fact]
+        public async Task ExportOutput_NonStepPath_ReturnsValidationError()
+        {
+            var manager = new CanvasManager();
+
+            var jsonResult = await manager.ExportOutput(new ExportOutputRequest { Path = "output.3dm" });
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+
+            Assert.Equal("error", response["status"]);
+            Assert.Equal("Export path must end in .step or .stp", response["message"]);
+        }
+
+        [Fact]
+        public async Task ExportOutput_NotRunningInRhino_ReturnsErrorJson()
+        {
+            var manager = new CanvasManager();
+
+            var jsonResult = await manager.ExportOutput(new ExportOutputRequest { Path = "output.step" });
+            var response = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(jsonResult);
+
+            Assert.Equal("error", response["status"]);
+            Assert.Equal("No active Grasshopper document", response["message"]);
+        }
     }
 }
