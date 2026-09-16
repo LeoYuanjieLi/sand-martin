@@ -90,6 +90,17 @@ Since starting up full Rhino instances as an MCP standard-I/O child process is t
 - [x] `connect_nodes(source_id: str, source_output_index: int, target_id: str, target_input_index: int)`: Wires two components together.
 - [x] `disconnect_nodes(source_id: str, target_id: str)`: Removes wires between components.
 
+### Private Host Automation
+
+These authenticated HTTP operations are intended for experiment controllers and
+are not registered as MCP tools:
+
+- `POST /reset_canvas` with an empty body removes all canvas objects except the
+  Sand Martin server component and its upstream controls, then recomputes.
+- `POST /export_output` with `{"path":"/absolute/output.step","overwrite":false}`
+  recomputes, requires one component nicknamed `OUTPUT`, validates that output
+  index `0` contains one closed solid, and exports it as STEP.
+
 ## Grasshopper Component Reference
 
 When using `create_node`, the `type` parameter must match the component's internal name or type name. Common components include:

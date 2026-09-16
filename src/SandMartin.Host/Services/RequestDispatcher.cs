@@ -92,6 +92,13 @@ namespace SandMartin.Host.Services
                                 var discReq = JsonConvert.DeserializeObject<DisconnectRequest>(body);
                                 responseBody = await _canvasManager.DisconnectNode(discReq);
                                 break;
+                            case "/reset_canvas":
+                                responseBody = await _canvasManager.ResetCanvas();
+                                break;
+                            case "/export_output":
+                                var exportReq = JsonConvert.DeserializeObject<ExportOutputRequest>(body);
+                                responseBody = await _canvasManager.ExportOutput(exportReq);
+                                break;
                             default:
                                 if (TryParseParameterRoute(path, out var route) && route.IsCollection)
                                 {
